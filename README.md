@@ -1,6 +1,6 @@
 # hmmm-language-support README
 
-Provides language support for the [Harvey Mudd Miniature Machine (HMMM) language](https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html#Halting).
+Provides language support for the [Harvey Mudd Miniature Machine (HMMM) Language](https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html#Halting).
 
 ## Features
 
