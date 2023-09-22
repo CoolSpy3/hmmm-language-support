@@ -3,11 +3,15 @@
   "displayName": "HMMM Language Support",
   "description": "Adds HMMM language support to VSCode",
   "version": "1.0.0",
+  "publisher": "CoolSpy3",
   "engines": {
     "vscode": "^1.82.0"
   },
   "categories": [
     "Programming Languages"
+  ],
+  "keywords": [
+    "HMMM"
   ],
   "repository": {
     "type": "git",
