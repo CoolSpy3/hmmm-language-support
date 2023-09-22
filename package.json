@@ -2,7 +2,7 @@
   "name": "hmmm-language-support",
   "displayName": "HMMM Language Support",
   "description": "Adds HMMM language support to VSCode",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.82.0"
   },
