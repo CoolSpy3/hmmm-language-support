@@ -1,0 +1,25 @@
+{
+  "name": "hmmm-language-support",
+  "displayName": "HMMM Language Support",
+  "description": "Adds HMMM language support to VSCode",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "hmmm",
+      "aliases": ["HMMM", "hmmm"],
+      "extensions": [".hmmm"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "hmmm",
+      "scopeName": "source.hmmm",
+      "path": "./syntaxes/hmmm.tmLanguage.json"
+    }]
+  }
+}
