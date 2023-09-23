@@ -51,7 +51,7 @@
 			"patterns": [
 				{
 					"name": "constant.numeric.hmmm",
-					"match": "\\b([0-9]+)\\b"
+					"match": "\\b(\\-?[0-9]+)\\b"
 				}
 			]
 		},

@@ -12,6 +12,9 @@ None :D
 
 ## Release Notes
 
+### 1.0.1
+- Fix highlighting of negative numbers
+
 ### 1.0.0
 
 Initial release of HMMM Language Support
