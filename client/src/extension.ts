@@ -4,10 +4,10 @@ import * as path from 'path';
 import { ExtensionContext } from 'vscode';
 
 import {
-    LanguageClient,
-    LanguageClientOptions,
-    ServerOptions,
-    TransportKind
+	LanguageClient,
+	LanguageClientOptions,
+	ServerOptions,
+	TransportKind
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
@@ -25,6 +25,7 @@ export function activate(context: ExtensionContext) {
 		debug: {
 			module: serverModule,
 			transport: TransportKind.ipc,
+			options: { execArgv: ['--nolazy', '--inspect=6009'] }
 		}
 	};
 

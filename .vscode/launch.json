@@ -14,9 +14,11 @@
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ],
             "outFiles": [
-                "${workspaceFolder}/out/**/*.js",
-                "${workspaceFolder}/out/**/*.js.map"
+                "${workspaceFolder}/**/out/**/*.js",
+                "${workspaceFolder}/**/out/**/*.js.map",
+                "${workspaceFolder}/**/src/**/*.ts"
             ],
+            "autoAttachChildProcesses": true,
             "preLaunchTask": {
                 "type": "npm",
                 "script": "watch"
