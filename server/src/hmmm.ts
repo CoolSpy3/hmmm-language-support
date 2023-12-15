@@ -1,3 +1,5 @@
+import { parseSignedInt } from "./helperfunctions";
+
 export enum HMMMOperandType {
     REGISTER = 1, // Without the =1, TypeScript is unhappy
     SIGNED_NUMBER,
@@ -186,4 +188,97 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     }
 
     return rep;
+}
+
+interface ParsedHMMMOperand {
+    type: HMMMOperandType;
+    value: number;
+}
+
+interface ParsedHMMMInstruction {
+    instruction: HMMMInstruction;
+    operands: ParsedHMMMOperand[];
+}
+
+/**
+ * Gets the bitmask for the opcode of an instruction (the bits that are not used for the operands)
+ * @param instr The instruction to get the mask for
+ * @returns The mask for the instruction
+*/
+export function getInstructionMask(instr: HMMMInstruction): number {
+    // Start with a mask that has all 16 bits set to 1, and then remove bits based on the operands
+    let mask = 0b1111_1111_1111_1111;
+
+    // An operand is 4 bits long, so remove 4 bits for each operand
+    if (instr.operand1) {
+        mask &= 0b1111_0000_1111_1111;
+    }
+
+    // Except for numbers, which are 8 bits long
+    if (instr.operand2 || instr.operand1 === HMMMOperandType.SIGNED_NUMBER || instr.operand1 === HMMMOperandType.UNSIGNED_NUMBER) {
+        mask &= 0b1111_1111_0000_1111;
+    }
+
+    if (instr.operand3 || instr.operand2 === HMMMOperandType.SIGNED_NUMBER || instr.operand2 === HMMMOperandType.UNSIGNED_NUMBER) {
+        mask &= 0b1111_1111_1111_0000;
+    }
+
+    return mask;
+}
+
+/**
+ * Parses an instruction from its binary representation
+ * @param line The line to parse
+ * @returns The parsed instruction
+ */
+export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | undefined {
+    // Remove all whitespace from the line and ensure it only contains binary
+    line = line.replace(/[^01]/g, '');
+
+    if (line.length !== 16) return undefined; // Invalid instruction! It should be 16 bits long
+
+    // Get the instruction
+    const opcode = parseInt(line, 2);
+    const instr = hmmmInstructions.find(instr => ((instr.opcode ^ opcode) & getInstructionMask(instr)) === 0);
+
+    if (!instr) return undefined; // Invalid instruction!
+
+    // Get the operands
+    const operands: ParsedHMMMOperand[] = [];
+
+    /**
+     * Parses an operand from its binary representation
+     * @param operandType The type of the operand
+     * @param operand The binary representation of the operand
+     * @returns The parsed operand
+     */
+    function parseOperand(operandType: HMMMOperandType, operand: string): ParsedHMMMOperand {
+        switch(operandType) {
+            case HMMMOperandType.REGISTER:
+                return { type: HMMMOperandType.REGISTER, value: parseInt(line.substring(4, 8), 2) };
+            case HMMMOperandType.SIGNED_NUMBER:
+                return { type: HMMMOperandType.SIGNED_NUMBER, value: parseSignedInt(line.substring(8, 16)) };
+            case HMMMOperandType.UNSIGNED_NUMBER:
+                return { type: HMMMOperandType.UNSIGNED_NUMBER, value: parseInt(line.substring(8, 16), 2) };
+        }
+    }
+
+    if (instr.operand1) {
+        operands.push(parseOperand(instr.operand1, line.substring(4, 8)));
+    }
+
+    if (instr.operand2) {
+        operands.push(parseOperand(instr.operand2, line.substring(8, 16)));
+    }
+
+    if (instr.operand3) {
+        if(instr.operand3 === HMMMOperandType.SIGNED_NUMBER || instr.operand3 === HMMMOperandType.UNSIGNED_NUMBER) {
+            // All numbers are represented with 8 bits, so the third argument cannot be a number
+            console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
+        } else {
+            operands.push(parseOperand(instr.operand3, line.substring(12, 16)));
+        }
+    }
+
+    return { instruction: instr, operands: operands };
 }

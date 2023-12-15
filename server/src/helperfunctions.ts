@@ -7,7 +7,25 @@ import {
 } from 'vscode-languageserver/node';
 import { getInstructionRepresentation, getInstructionSignature, hmmmInstructions } from './hmmm';
 
-//#region vscode
+
+//#region Misc
+
+/**
+ * Parsed a signed binary string in two's complement notation to a number
+ * @param value The binary string to parse
+ * @returns The parsed number
+ */
+export function parseSignedInt(value: string): number {
+    if (value[0] === '1') { // Negative number
+        return parseInt(value.slice(1), 2) - 2 ** (value.length - 1);
+    } else { // Positive number
+        return parseInt(value, 2);
+    }
+}
+
+//#endregion
+
+//#region VSCode
 
 /**
  * Checks if a position is within a group in a RegExpMatchArray

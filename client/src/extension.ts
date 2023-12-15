@@ -10,46 +10,57 @@ import {
 	TransportKind
 } from 'vscode-languageclient/node';
 
-let client: LanguageClient;
+let hbClient: LanguageClient;
+let hmmmClient: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	// The server is implemented in node
-	const serverModule = context.asAbsolutePath(
-		path.join('server', 'out', 'hmmmserver.js')
-	);
+	const hbServerModule = context.asAbsolutePath(path.join('server', 'out', 'hbserver.js'));
+	const hmmmServerModule = context.asAbsolutePath(path.join('server', 'out', 'hmmmserver.js'));
 
-	// If the extension is launched in debug mode then the debug server options are used
-	// Otherwise the run options are used
-	const serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
+	// Server options
+	const hbServerOptions: ServerOptions = {
+		run: { module: hbServerModule, transport: TransportKind.ipc },
 		debug: {
-			module: serverModule,
+			module: hbServerModule,
 			transport: TransportKind.ipc,
-			options: { execArgv: ['--nolazy', '--inspect=6009'] }
+			options: { execArgv: ['--nolazy', '--inspect=6009'] } // Allow debugging
+		}
+	};
+	const hmmmServerOptions: ServerOptions = {
+		run: { module: hmmmServerModule, transport: TransportKind.ipc },
+		debug: {
+			module: hmmmServerModule,
+			transport: TransportKind.ipc,
+			options: { execArgv: ['--nolazy', '--inspect=6009'] } // Allow debugging
 		}
 	};
 
-	// Options to control the language client
-	const clientOptions: LanguageClientOptions = {
-		// Register the server for HMMM documents
-		documentSelector: [{ scheme: 'file', language: 'hmmm' }]
-	};
+	// Client options
+	const hbClientOptions: LanguageClientOptions = { documentSelector: [{ scheme: 'file', language: 'hb' }] };
+	const hmmmClientOptions: LanguageClientOptions = { documentSelector: [{ scheme: 'file', language: 'hmmm' }] };
 
-	// Create the language client and start the client.
-	client = new LanguageClient(
+	// Create the language clients
+	hbClient = new LanguageClient(
+		'hbLanguageServer',
+		'HMMM Binary Language Server',
+		hbServerOptions,
+		hbClientOptions
+	);
+	hmmmClient = new LanguageClient(
 		'hmmmLanguageServer',
 		'HMMM Language Server',
-		serverOptions,
-		clientOptions
+		hmmmServerOptions,
+		hmmmClientOptions
 	);
 
-	// Start the client. This will also launch the server
-	client.start();
+	// Start the clients. This will also launch the servers
+	hbClient.start();
+	hmmmClient.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {
-	if (!client) {
+	if (!hbClient && !hmmmClient) {
 		return undefined;
 	}
-	return client.stop();
+	return Promise.all([hbClient?.stop(), hmmmClient?.stop()]).then(() => undefined);
 }
