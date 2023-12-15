@@ -14,9 +14,11 @@ import {
     HoverParams,
     InitializeParams,
     InitializeResult,
+    Location,
     MarkupKind,
     ProposedFeatures,
     Range,
+    ReferenceParams,
     TextDocumentSyncKind,
     TextDocuments,
     createConnection,
@@ -115,7 +117,8 @@ connection.onInitialize((params: InitializeParams) => {
                 triggerCharacters: [' ', '\n']
             },
             definitionProvider: true,
-            hoverProvider: true
+            hoverProvider: true,
+            referencesProvider: true
         }
     };
     if (hasWorkspaceFolderCapability) {
@@ -506,11 +509,11 @@ function isInIndexRange(value: number, index: number, indices: RegExpIndicesArra
 }
 
 connection.onCompletion(
-    (textDocumentPosition: CompletionParams): CompletionList => {
+    (params: CompletionParams): CompletionList => {
         // The pass parameter contains the position of the text document in
         // which code complete got requested. For the example we ignore this
         // info and always provide the same completion items.
-        const document = documents.get(textDocumentPosition.textDocument.uri);
+        const document = documents.get(params.textDocument.uri);
         const completionList = CompletionList.create();
 
         if (!document) {
@@ -519,12 +522,12 @@ connection.onCompletion(
             return completionList;
         }
 
-        const line = document.getText(Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
 
         let m: RegExpMatchArray | null;
 
         if (!line.trim()) {
-            populateLineNumber(completionList, textDocumentPosition.position.line, document);
+            populateLineNumber(completionList, params.position.line, document);
             populateInstructions(completionList);
             return completionList;
         }
@@ -535,12 +538,12 @@ connection.onCompletion(
         }
 
         const indices = m.indices;
-        const position = textDocumentPosition.position.character;
+        const position = params.position.character;
 
     if(isInIndexRange(position, InstructionPart.OTHER, indices)) return completionList;
 
         if(isInIndexRange(position, InstructionPart.LINE_NUM, indices)) {
-            populateLineNumber(completionList, textDocumentPosition.position.line, document);
+            populateLineNumber(completionList, params.position.line, document);
             return completionList;
         }
 
@@ -582,24 +585,31 @@ function getSelectedWord(document: TextDocument, position: Position): [string, R
 }
 
 connection.onDefinition(
-    (textDocumentPosition: DefinitionParams): Definition => {
-        const document = documents.get(textDocumentPosition.textDocument.uri);
+    (params: DefinitionParams): Definition => {
+        const document = documents.get(params.textDocument.uri);
 
         if (!document) return [];
 
-        const line = document.getText(Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE));
+        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
 
         const commentPos = line.indexOf('#');
-        if(commentPos != -1 && textDocumentPosition.position.character >= commentPos) return [];
+        if(commentPos != -1 && params.position.character >= commentPos) return [];
 
         const spacePos = line.indexOf(' ');
-        if(spacePos != -1 && textDocumentPosition.position.character <= spacePos) return [];
+        if(spacePos != -1 && params.position.character <= spacePos) return [];
 
-        const word = getSelectedWord(document, textDocumentPosition.position)[0];
+        const word = getSelectedWord(document, params.position)[0];
 
         const lineNum = parseInt(word);
 
         if (isNaN(lineNum) || lineNum < 0) return [];
+
+        let m: RegExpMatchArray | null;
+        if (!(m = instructionRegex.exec(line))) return [];
+
+        const instruction = m[InstructionPart.INSTRUCTION];
+
+        if(!(instruction.toLowerCase().startsWith("j") || instruction.toLowerCase().startsWith("call"))) return [];
 
         let definitions: Definition = [];
 
@@ -611,30 +621,30 @@ connection.onDefinition(
             const num = parseInt(line);
             if (num === lineNum) {
                 definitions.push({
-                    uri: textDocumentPosition.textDocument.uri,
+                    uri: params.textDocument.uri,
                     range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
                 });
             }
         }
 
-        if(!definitions.length) return [{ uri: textDocumentPosition.textDocument.uri, range: Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE) }];
+        if(!definitions.length) return [{ uri: params.textDocument.uri, range: Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE) }];
 
         return definitions;
     }
 );
 
 connection.onHover(
-    (textDocumentPosition: HoverParams): Hover => {
-        const document = documents.get(textDocumentPosition.textDocument.uri);
+    (params: HoverParams): Hover => {
+        const document = documents.get(params.textDocument.uri);
 
         if (!document) return { contents: [] };
 
-        const line = document.getText(Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE));
+        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
 
         const commentPos = line.indexOf('#');
-        if(commentPos != -1 && textDocumentPosition.position.character >= commentPos) return { contents: [] };
+        if(commentPos != -1 && params.position.character >= commentPos) return { contents: [] };
 
-        const word = getSelectedWord(document, textDocumentPosition.position);
+        const word = getSelectedWord(document, params.position);
 
         const instruction = getInstructionByName(word[0]);
 
@@ -695,6 +705,83 @@ connection.onHover(
         }
 
         return { contents: [] };
+    }
+);
+
+connection.onReferences(
+    (params: ReferenceParams): Location[] | undefined => {
+        const document = documents.get(params.textDocument.uri);
+
+        if (!document) return undefined;
+
+        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
+
+        const commentPos = line.indexOf('#');
+        if(commentPos != -1 && params.position.character >= commentPos) return undefined;
+
+        const spacePos = line.indexOf(' ');
+        if(spacePos != -1 && params.position.character > spacePos) return undefined;
+
+        const word = getSelectedWord(document, params.position);
+
+        const lineNum = parseInt(word[0]);
+
+        if (isNaN(lineNum) || lineNum < 0) return undefined;
+
+        let locations: Location[] = [];
+
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+
+            if(!line) continue;
+
+            let m: RegExpMatchArray | null;
+            if (!(m = instructionRegex.exec(line))) continue;
+
+            if(!m.indices) {
+                if(line.slice(line.indexOf(' ')).includes(lineNum.toString())) {
+                    locations.push({
+                        uri: params.textDocument.uri,
+                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                    });
+                }
+                continue;
+            }
+
+            if(!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue;
+
+            if(m[InstructionPart.OPERAND1]) {
+                const operand1 = m[InstructionPart.OPERAND1];
+                if(parseInt(operand1) === lineNum) {
+                    locations.push({
+                        uri: params.textDocument.uri,
+                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                    });
+                }
+            }
+
+            if(m[InstructionPart.OPERAND2]) {
+                const operand2 = m[InstructionPart.OPERAND2];
+                if(parseInt(operand2) === lineNum) {
+                    locations.push({
+                        uri: params.textDocument.uri,
+                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                    });
+                }
+            }
+
+            if(m[InstructionPart.OPERAND3]) {
+                const operand3 = m[InstructionPart.OPERAND3];
+                if(parseInt(operand3) === lineNum) {
+                    locations.push({
+                        uri: params.textDocument.uri,
+                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                    });
+                }
+            }
+        }
+
+        return locations;
     }
 );
 
