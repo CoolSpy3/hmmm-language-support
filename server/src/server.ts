@@ -10,8 +10,11 @@ import {
     Diagnostic,
     DiagnosticSeverity,
     DidChangeConfigurationNotification,
+    Hover,
+    HoverParams,
     InitializeParams,
     InitializeResult,
+    MarkupKind,
     ProposedFeatures,
     Range,
     TextDocumentSyncKind,
@@ -74,6 +77,10 @@ let hmmmInstructions: HMMMInstruction[];
     ];
 }
 
+function getInstructionByName(name: string): HMMMInstruction | undefined {
+    return hmmmInstructions.find(instr => instr.name === name);
+}
+
 // Language Server Setup
 
 const connection = createConnection(ProposedFeatures.all)
@@ -107,7 +114,8 @@ connection.onInitialize((params: InitializeParams) => {
             completionProvider: {
                 triggerCharacters: [' ', '\n']
             },
-            definitionProvider: true
+            definitionProvider: true,
+            hoverProvider: true
         }
     };
     if (hasWorkspaceFolderCapability) {
@@ -299,7 +307,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
             continue;
         }
 
-        const hmmmInstruction = hmmmInstructions.find(instr => instr.name === instruction);
+        const hmmmInstruction = getInstructionByName(instruction);
 
         if (!hmmmInstruction) {
             diagnostics.push({
@@ -453,21 +461,21 @@ function getInstructionRepresentation(instr: HMMMInstruction): string {
     let rep = (instr.opcode >>> 0).toString(2).padStart(16, '0'); // https://stackoverflow.com/a/16155417
 
     rep = rep.match(/.{4}/g)?.join(' ') ?? rep; // https://stackoverflow.com/a/53427113
-    rep = rep.padEnd(20, ' '); // Shouldn't be necessary, but just in case
+    rep = rep.padEnd(19, ' '); // Shouldn't be necessary, but just in case
 
     if (instr.operand1) {
         if(instr.operand1 === HMMMOperandType.REGISTER) {
-            rep = `${rep.substring(0, 4)} XXXX ${rep.substring(9)}`;
+            rep = `${rep.substring(0, 4)} XXXX ${rep.substring(10)}`;
         } else {
-            rep = `${rep.substring(0, 9)} NNNN NNNN`;
+            rep = `${rep.substring(0, 10)} NNNN NNNN`;
         }
     }
 
     if (instr.operand2) {
         if(instr.operand2 === HMMMOperandType.REGISTER) {
-            rep = `${rep.substring(0, 9)} YYYY ${rep.substring(14)}`;
+            rep = `${rep.substring(0, 9)} YYYY ${rep.substring(15)}`;
         } else {
-            rep = `${rep.substring(0, 14)} NNNN NNNN`;
+            rep = `${rep.substring(0, 9)} NNNN NNNN`;
         }
     }
 
@@ -541,7 +549,7 @@ connection.onCompletion(
             return completionList;
         }
 
-        const instruction = hmmmInstructions.find(instr => instr.name === m![InstructionPart.INSTRUCTION]);
+        const instruction = getInstructionByName(m[InstructionPart.INSTRUCTION]);
 
         if (!instruction) {
             populateRegisters(completionList);
@@ -565,12 +573,12 @@ connection.onCompletion(
     }
 );
 
-function getSelectedWord(document: TextDocument, position: Position): string {
+function getSelectedWord(document: TextDocument, position: Position): [string, Range] {
     const line = document.getText(Range.create(position.line, uinteger.MIN_VALUE, position.line, uinteger.MAX_VALUE));
     let wordRange = Range.create(position.line, position.character, position.line, position.character); // Copy position so start and end don't point to the same object
     while (wordRange.start.character > 0 && !/\s/.test(line[wordRange.start.character - 1])) wordRange.start.character--;
     while (wordRange.end.character < line.length && !/\s/.test(line[wordRange.end.character])) wordRange.end.character++;
-    return line.slice(wordRange.start.character, wordRange.end.character);
+    return [line.slice(wordRange.start.character, wordRange.end.character), wordRange];
 }
 
 connection.onDefinition(
@@ -587,7 +595,7 @@ connection.onDefinition(
         const spacePos = line.indexOf(' ');
         if(spacePos != -1 && textDocumentPosition.position.character <= spacePos) return [];
 
-        const word = getSelectedWord(document, textDocumentPosition.position);
+        const word = getSelectedWord(document, textDocumentPosition.position)[0];
 
         const lineNum = parseInt(word);
 
@@ -612,6 +620,81 @@ connection.onDefinition(
         if(!definitions.length) return [{ uri: textDocumentPosition.textDocument.uri, range: Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE) }];
 
         return definitions;
+    }
+);
+
+connection.onHover(
+    (textDocumentPosition: HoverParams): Hover => {
+        const document = documents.get(textDocumentPosition.textDocument.uri);
+
+        if (!document) return { contents: [] };
+
+        const line = document.getText(Range.create(textDocumentPosition.position.line, uinteger.MIN_VALUE, textDocumentPosition.position.line, uinteger.MAX_VALUE));
+
+        const commentPos = line.indexOf('#');
+        if(commentPos != -1 && textDocumentPosition.position.character >= commentPos) return { contents: [] };
+
+        const word = getSelectedWord(document, textDocumentPosition.position);
+
+        const instruction = getInstructionByName(word[0]);
+
+        if(instruction) {
+            return {
+                contents: {
+                    kind: MarkupKind.PlainText,
+                    value: instruction.description
+                },
+                range: word[1]
+            };
+        }
+
+        if(/^r(\d|1[0-5])$/i.test(word[0])) {
+            if(word[0] === 'r0') {
+                return {
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: 'Always 0'
+                    },
+                    range: word[1]
+                };
+            }
+            if(word[0] === 'r13') {
+                return {
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: 'Return Value'
+                    },
+                    range: word[1]
+                };
+            }
+            if(word[0] === 'r14') {
+                return {
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: 'Return Address'
+                    },
+                    range: word[1]
+                };
+            }
+            if(word[0] === 'r15') {
+                return {
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: 'Stack Pointer'
+                    },
+                    range: word[1]
+                };
+            }
+            return {
+                contents: {
+                    kind: MarkupKind.Markdown,
+                    value: 'General Purpose Register'
+                },
+                range: word[1]
+            };
+        }
+
+        return { contents: [] };
     }
 );
 
