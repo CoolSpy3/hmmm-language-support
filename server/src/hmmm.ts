@@ -45,14 +45,29 @@ export let hmmmInstructions: HMMMInstruction[];
         hmmmInstr("mod", 0b1010_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rX = rY % rZ (returns the remainder of integer division)"),
         hmmmInstr("jumpn", 0b1011_0000_0000_0000, HMMMOperandType.UNSIGNED_NUMBER, undefined, undefined, "Set program counter to address N"),
         hmmmInstr("calln", 0b1011_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "Copy addr. of next instr. into rX and then jump to mem. addr. N"),
-        hmmmInstr("jeqzn", 0b1100_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX == 0b0000_0000_0000_0000, then jump to line N"),
-        hmmmInstr("jnezn", 0b1101_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX != 0b0000_0000_0000_0000, then jump to line N"),
-        hmmmInstr("jgtzn", 0b1110_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX > 0b0000_0000_0000_0000, then jump to line N"),
-        hmmmInstr("jltzn", 0b1111_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX < 0b0000_0000_0000_0000, then jump to line N"),
+        hmmmInstr("jeqzn", 0b1100_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX == 0, then jump to line N"),
+        hmmmInstr("jnezn", 0b1101_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX != 0, then jump to line N"),
+        hmmmInstr("jgtzn", 0b1110_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX > 0, then jump to line N"),
+        hmmmInstr("jltzn", 0b1111_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX < 0, then jump to line N"),
     ];
 }
 
+export let hmmmAliases = new Map<string, string>([
+    ["mov", "copy"],
+    ["jump", "jumpr"],
+    ["jeqz", "jeqzn"],
+    ["jnez", "jnezn"],
+    ["jgtz", "jgtzn"],
+    ["jltz", "jltzn"],
+    ["call", "calln"],
+    ["loadi", "loadr"],
+    ["load", "loadr"],
+    ["storei", "storer"],
+    ["store", "storer"]
+]);
+
 export function getInstructionByName(name: string): HMMMInstruction | undefined {
+    if(hmmmAliases.has(name)) name = hmmmAliases.get(name)!; // Get the instruction name from the alias map if it exists (otherwise use the original name
     return hmmmInstructions.find(instr => instr.name === name);
 }
 
