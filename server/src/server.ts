@@ -2,6 +2,9 @@
 
 import { Position, TextDocument } from 'vscode-languageserver-textdocument';
 import {
+    CodeAction,
+    CodeActionKind,
+    CodeActionParams,
     CompletionItemKind,
     CompletionList,
     CompletionParams,
@@ -21,6 +24,7 @@ import {
     ReferenceParams,
     TextDocumentSyncKind,
     TextDocuments,
+    TextEdit,
     createConnection,
     uinteger
 } from 'vscode-languageserver/node';
@@ -113,6 +117,7 @@ connection.onInitialize((params: InitializeParams) => {
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             // Tell the client that this server supports code completion.
+            codeActionProvider: true,
             completionProvider: {
                 triggerCharacters: [' ', '\n']
             },
@@ -195,6 +200,20 @@ function validateOperand(operand: string): HMMMDetectedOperand {
     return HMMMDetectedOperandType.NUMBER;
 }
 
+enum HMMMErrorType {
+    INVALID_LINE,
+    MISSING_LINE_NUM,
+    INCORRECT_LINE_NUM,
+    INVALID_OPERAND,
+    INVALID_REGISTER,
+    INVALID_NUMBER,
+    UNEXPECTED_TOKEN,
+    MISSING_INSTRUCTION,
+    INVALID_INSTRUCTION,
+    MISSING_OPERAND,
+    TOO_MANY_OPERANDS
+}
+
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     let diagnostics: Diagnostic[] = [];
     const defaultIndices = Array(7).fill([uinteger.MIN_VALUE, uinteger.MAX_VALUE]);
@@ -212,7 +231,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Error,
                 range: Range.create(lineIdx, uinteger.MIN_VALUE, lineIdx, uinteger.MAX_VALUE),
                 message: `Invalid line!`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.INVALID_LINE
             });
             continue;
         }
@@ -227,7 +247,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Error,
                 range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][0] + 1),
                 message: `Missing line number`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.MISSING_LINE_NUM
             });
 
             m = instructionRegex.exec(`0 ${line}`) ?? m;
@@ -237,7 +258,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Warning,
                 range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
                 message: `Incorrect line number! Should be ${numCodeLines}`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.INCORRECT_LINE_NUM
             });
         }
 
@@ -253,21 +275,24 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     severity: DiagnosticSeverity.Error,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid operand!`,
-                    source: 'HMMM Language Server'
+                    source: 'HMMM Language Server',
+                    data: HMMMErrorType.INVALID_OPERAND
                 });
             } else if (operandType === HMMMDetectedOperandType.INVALID_REGISTER) {
                 diagnostics.push({
                     severity: DiagnosticSeverity.Error,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid register! HMMM only supports registers r0-r15`,
-                    source: 'HMMM Language Server'
+                    source: 'HMMM Language Server',
+                    data: HMMMErrorType.INVALID_REGISTER
                 });
             } else if (operandType === HMMMDetectedOperandType.INVALID_NUMBER) {
                 diagnostics.push({
                     severity: DiagnosticSeverity.Warning,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid number! HMMM only supports numerical arguments from -128 to 127 (signed) or 0 to 255 (unsigned)`,
-                    source: 'HMMM Language Server'
+                    source: 'HMMM Language Server',
+                    data: HMMMErrorType.INVALID_NUMBER
                 });
             }
         }
@@ -294,7 +319,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Error,
                 range: Range.create(lineIdx, indices[InstructionPart.OTHER][0], lineIdx, indices[InstructionPart.OTHER][1]),
                 message: `Unexpected token!`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.UNEXPECTED_TOKEN
             });
         }
 
@@ -305,7 +331,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Error,
                 range: Range.create(lineIdx, Math.max(0, indices[InstructionPart.LINE_NUM][1] - 1), lineIdx, indices[InstructionPart.LINE_NUM][1]),
                 message: `Expected instruction`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.MISSING_INSTRUCTION
             });
             continue;
         }
@@ -317,7 +344,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 severity: DiagnosticSeverity.Error,
                 range: Range.create(lineIdx, indices[InstructionPart.INSTRUCTION][0], lineIdx, indices[InstructionPart.INSTRUCTION][1]),
                 message: `Unknown instruction`,
-                source: 'HMMM Language Server'
+                source: 'HMMM Language Server',
+                data: HMMMErrorType.INVALID_INSTRUCTION
             });
         }
 
@@ -335,7 +363,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     severity: DiagnosticSeverity.Error,
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a register as operand 1`,
-                                    source: 'HMMM Language Server'
+                                    source: 'HMMM Language Server',
+                                    data: HMMMErrorType.INVALID_REGISTER
                                 });
                             }
                             break;
@@ -345,7 +374,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     severity: operandType === HMMMDetectedOperandType.UNSIGNED_NUMBER || operandType === HMMMDetectedOperandType.INVALID_NUMBER ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
-                                    source: 'HMMM Language Server'
+                                    source: 'HMMM Language Server',
+                                    data: HMMMErrorType.INVALID_NUMBER
                                 });
                             }
                             break;
@@ -355,7 +385,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     severity: operandType === HMMMDetectedOperandType.SIGNED_NUMBER || operandType === HMMMDetectedOperandType.INVALID_NUMBER ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
-                                    source: 'HMMM Language Server'
+                                    source: 'HMMM Language Server',
+                                    data: HMMMErrorType.INVALID_NUMBER
                                 });
                             }
                             break;
@@ -365,7 +396,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                         severity: DiagnosticSeverity.Error,
                         range: Range.create(lineIdx, indices[InstructionPart.INSTRUCTION][0], lineIdx, indices[InstructionPart.INSTRUCTION][1]),
                         message: `${instruction.name} expects ${numExpectedArgs} argument${numExpectedArgs === 1 ? '' : 's'}`,
-                        source: 'HMMM Language Server'
+                        source: 'HMMM Language Server',
+                        data: HMMMErrorType.MISSING_OPERAND
                     });
                     return true;
                 }
@@ -374,7 +406,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     severity: DiagnosticSeverity.Error,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `${instruction.name} only expects ${numExpectedArgs} argument${numExpectedArgs === 1 ? '' : 's'}`,
-                    source: 'HMMM Language Server'
+                    source: 'HMMM Language Server',
+                    data: HMMMErrorType.TOO_MANY_OPERANDS
                 });
             }
             return false;
@@ -782,6 +815,55 @@ connection.onReferences(
         }
 
         return locations;
+    }
+);
+
+connection.onCodeAction(
+    (params: CodeActionParams): CodeAction[] => {
+        let actions: CodeAction[] = [];
+        params.context.diagnostics.forEach(diagnostic => {
+            if (diagnostic.source !== 'HMMM Language Server') return;
+
+            const document = documents.get(params.textDocument.uri);
+            if (!document) return;
+            const line = document.getText(Range.create(diagnostic.range.start.line, uinteger.MIN_VALUE, diagnostic.range.start.line, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+
+            const errorCode = diagnostic.data as HMMMErrorType;
+
+            switch(errorCode) {
+                case HMMMErrorType.INCORRECT_LINE_NUM:
+                    {
+                        const correctLineNum = getExpectedLineNumber(diagnostic.range.start.line, document);
+                        actions.push({
+                            title: `Change Line Number to ${correctLineNum}`,
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, correctLineNum.toString())]
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case HMMMErrorType.MISSING_LINE_NUM:
+                    {
+                        const correctLineNum = getExpectedLineNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
+                        actions.push({
+                            title: 'Add Line Number',
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)), correctLineNum.toString() + ' ')]
+                                }
+                            }
+                        });
+                        break;
+                    }
+            }
+        });
+        return actions;
     }
 );
 
