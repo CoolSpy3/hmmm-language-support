@@ -139,13 +139,13 @@ connection.languages.semanticTokens.on(
              * @returns The token type and modifiers for the register
              */
             function getRegisterTokenType(register: number): [TokenTypes, TokenModifiers] {
-                switch(register) { // TODO: Make this work
+                switch(register) { // This mostly works, but I think there are still some problems with TokenModifiers that I haven't been able to figure out yet
                     case 0:
-                        return [TokenTypes.string, 0];
+                        return [TokenTypes.number, (1 << TokenModifiers.readonly) | (1 << TokenModifiers.defaultLibrary)];
                     case 13:
                     case 14:
                     case 15:
-                        return [TokenTypes.member, 0];
+                        return [TokenTypes.variable, 1 << TokenModifiers.defaultLibrary];
                     default:
                         return [TokenTypes.parameter, 0];
                 }
@@ -171,7 +171,7 @@ connection.languages.semanticTokens.on(
             switch(instruction.instruction.operand2) {
                 case HMMMOperandType.REGISTER:
                     {
-                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[1].value);
                         tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
                         break;
                     }
@@ -188,7 +188,7 @@ connection.languages.semanticTokens.on(
             switch(instruction.instruction.operand3) {
                 case HMMMOperandType.REGISTER:
                     {
-                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[2].value);
                         tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
                         break;
                     }
