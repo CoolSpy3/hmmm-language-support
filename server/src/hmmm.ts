@@ -11,6 +11,7 @@ export type HMMMOperand = HMMMOperandType | undefined;
 export interface HMMMInstruction {
     name: string;
     opcode: number;
+    mask: number;
     operand1: HMMMOperand;
     operand2: HMMMOperand;
     operand3: HMMMOperand;
@@ -21,7 +22,9 @@ export let hmmmInstructions: HMMMInstruction[];
 
 {
     function hmmmInstr(name: string, opcode: number, operand1: HMMMOperand, operand2: HMMMOperand, operand3: HMMMOperand, description: string): HMMMInstruction {
-        return { name, opcode, operand1, operand2, operand3, description };
+        const instr = { name, opcode, mask: 0, operand1, operand2, operand3, description };
+        instr.mask = getInstructionMask(instr);
+        return instr;
     }
 
     hmmmInstructions = [
@@ -239,9 +242,12 @@ export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | un
 
     // Get the instruction
     const opcode = parseInt(line, 2);
-    const instr = hmmmInstructions.find(instr => ((instr.opcode ^ opcode) & getInstructionMask(instr)) === 0);
+    const instructions = hmmmInstructions.filter(instr => ((instr.opcode ^ opcode) & instr.mask) === 0);
 
-    if (!instr) return undefined; // Invalid instruction!
+    if (!instructions.length) return undefined; // Invalid instruction!
+
+    // If multiple instructions match, use the one with the highest mask (the one which is the most restrictive) (ex. prefer jumpn of calln)
+    const instr = instructions.sort((instr1, instr2) => -(instr1.mask - instr2.mask))[0]; // negate the result so it sorts in descending order
 
     // Get the operands
     const operands: ParsedHMMMOperand[] = [];
