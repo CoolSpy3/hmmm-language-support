@@ -23,12 +23,23 @@
       "id": "hmmm",
       "aliases": ["HMMM", "hmmm"],
       "extensions": [".hmmm"],
-      "configuration": "./language-configuration.json"
+      "configuration": "./syntaxes/hmmm-language-configuration.json"
+    },
+    {
+      "id": "hb",
+      "aliases": ["HB", "hb", "HMMM Binary"],
+      "extensions": [".hb"],
+      "configuration": "./syntaxes/hb-language-configuration.json"
     }],
     "grammars": [{
       "language": "hmmm",
       "scopeName": "source.hmmm",
       "path": "./syntaxes/hmmm.tmLanguage.json"
+    },
+    {
+      "language": "hb",
+      "scopeName": "source.hb",
+      "path": "./syntaxes/hb.tmLanguage.json"
     }]
   },
   "scripts": {
