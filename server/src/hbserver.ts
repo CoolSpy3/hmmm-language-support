@@ -2,17 +2,23 @@
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
+    Diagnostic,
+    DiagnosticSeverity,
     InitializeParams,
     InlayHint,
     InlayHintParams,
     ProposedFeatures,
     Range,
+    SemanticTokens,
+    SemanticTokensBuilder,
+    SemanticTokensParams,
     TextDocumentSyncKind,
     TextDocuments,
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
 import { HMMMOperandType, parseBinaryInstruction } from "./hmmm";
+import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
 const connection = createConnection(ProposedFeatures.all)
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument)
@@ -22,7 +28,11 @@ connection.onInitialize((params: InitializeParams) => {
         // Tell the client what we can do
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
-            inlayHintProvider: true
+            inlayHintProvider: true,
+            semanticTokensProvider: {
+                legend: computeLegend(params.capabilities.textDocument?.semanticTokens!),
+                full: true
+            }
         }
     };
 });
@@ -30,6 +40,40 @@ connection.onInitialize((params: InitializeParams) => {
 //#endregion
 
 //#region Language Server Implementation
+
+/**
+ * Validates a text document and sends diagnostics to the client
+ *
+ * @param textDocument The text document to validate
+ * @returns A promise that resolves when the validation is complete
+ */
+async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+    /*
+        Flag invalid instructions
+    */
+
+    let diagnostics: Diagnostic[] = [];
+
+    for(let i = 0; i < textDocument.lineCount; i++) {
+        const lineRange = Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE);
+        const line = textDocument.getText(lineRange);
+
+        const instruction = parseBinaryInstruction(line);
+
+        if(!instruction) {
+            diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: lineRange,
+                message: 'Invalid Instruction',
+                source: 'HMMM Binary Language Server',
+            });
+        }
+    }
+}
+
+documents.onDidChangeContent(change => {
+    validateTextDocument(change.document); // When the document changes, validate it
+});
 
 connection.languages.inlayHint.on(
     (params: InlayHintParams): InlayHint[] => {
@@ -60,6 +104,105 @@ connection.languages.inlayHint.on(
         }
 
         return hints;
+    }
+);
+
+connection.languages.semanticTokens.on(
+    (params: SemanticTokensParams): SemanticTokens => {
+        /*
+            Show semantic tokens for each instruction
+        */
+
+        let document = documents.get(params.textDocument.uri);
+
+        const tokenBuilder = new SemanticTokensBuilder();
+
+        if(!document) return tokenBuilder.build(); // If the document doesn't exist, return an empty array
+
+        for(let i = 0; i < document.lineCount; i++) {
+            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE));
+
+            const instruction = parseBinaryInstruction(line);
+
+            if(!instruction) continue; // If the line isn't a valid instruction, skip it
+
+            // Try to match the different parts of the instruction
+            let m: RegExpExecArray | null;
+            if(!(m = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d.exec(line))?.indices) continue; // If the line doesn't match the regex, skip it
+
+            // Highlight the instruction
+            tokenBuilder.push(i, m.indices[1][0], 4, TokenTypes.keyword, 0);
+
+            /**
+             * Gets the token type and modifiers for a register
+             * @param register The register to get the token type for
+             * @returns The token type and modifiers for the register
+             */
+            function getRegisterTokenType(register: number): [TokenTypes, TokenModifiers] {
+                switch(register) { // TODO: Make this work
+                    case 0:
+                        return [TokenTypes.string, 0];
+                    case 13:
+                    case 14:
+                    case 15:
+                        return [TokenTypes.member, 0];
+                    default:
+                        return [TokenTypes.parameter, 0];
+                }
+            }
+
+            switch(instruction.instruction.operand1) {
+                case HMMMOperandType.REGISTER:
+                    {
+                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+                        tokenBuilder.push(i, m.indices[2][0], 4, tokenType, tokenModifier);
+                        break;
+                    }
+                case HMMMOperandType.SIGNED_NUMBER:
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    {
+                        tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
+                        tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+                        break;
+                    }
+                default:
+                    tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
+            }
+            switch(instruction.instruction.operand2) {
+                case HMMMOperandType.REGISTER:
+                    {
+                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+                        tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
+                        break;
+                    }
+                case HMMMOperandType.SIGNED_NUMBER:
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    {
+                        tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
+                        tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+                        break;
+                    }
+                default:
+                    tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.keyword, 0);
+            }
+            switch(instruction.instruction.operand3) {
+                case HMMMOperandType.REGISTER:
+                    {
+                        const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+                        tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
+                        break;
+                    }
+                case HMMMOperandType.SIGNED_NUMBER:
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    // Numbers are never the third operand, so this should never happen
+                    console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);
+                    break;
+                default:
+                    tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.keyword, 0);
+            }
+        }
+
+        return tokenBuilder.build();
     }
 );
 

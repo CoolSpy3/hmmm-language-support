@@ -42,7 +42,7 @@
 		"registers": {
 			"patterns": [
 				{
-					"name": "constant.language.hmmm",
+					"name": "support.constant.hmmm",
 					"match": "\\br0\\b"
 				},
 				{

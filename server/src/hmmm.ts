@@ -255,7 +255,7 @@ export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | un
     function parseOperand(operandType: HMMMOperandType, operand: string): ParsedHMMMOperand {
         switch(operandType) {
             case HMMMOperandType.REGISTER:
-                return { type: HMMMOperandType.REGISTER, value: parseInt(line.substring(4, 8), 2) };
+                return { type: HMMMOperandType.REGISTER, value: parseInt(operand, 2) };
             case HMMMOperandType.SIGNED_NUMBER:
                 return { type: HMMMOperandType.SIGNED_NUMBER, value: parseSignedInt(line.substring(8, 16)) };
             case HMMMOperandType.UNSIGNED_NUMBER:
@@ -268,7 +268,7 @@ export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | un
     }
 
     if (instr.operand2) {
-        operands.push(parseOperand(instr.operand2, line.substring(8, 16)));
+        operands.push(parseOperand(instr.operand2, line.substring(8, 12)));
     }
 
     if (instr.operand3) {
