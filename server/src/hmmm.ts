@@ -169,7 +169,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
         if(instr.operand1 === HMMMOperandType.REGISTER) {
             rep = `${rep.substring(0, 4)} XXXX ${rep.substring(10)}`;
         } else {
-            rep = `${rep.substring(0, 10)} NNNN NNNN`;
+            rep = `${rep.substring(0, 9)} NNNN NNNN`;
         }
     }
 
@@ -213,16 +213,18 @@ export function getInstructionMask(instr: HMMMInstruction): number {
     let mask = 0b1111_1111_1111_1111;
 
     // An operand is 4 bits long, so remove 4 bits for each operand
-    if (instr.operand1) {
+    if (instr.operand1 === HMMMOperandType.REGISTER) {
         mask &= 0b1111_0000_1111_1111;
     }
 
+    const hasNumericalArg = instr.operand1 === HMMMOperandType.SIGNED_NUMBER || instr.operand1 === HMMMOperandType.UNSIGNED_NUMBER || instr.operand2 === HMMMOperandType.SIGNED_NUMBER || instr.operand2 === HMMMOperandType.UNSIGNED_NUMBER;
+
     // Except for numbers, which are 8 bits long
-    if (instr.operand2 || instr.operand1 === HMMMOperandType.SIGNED_NUMBER || instr.operand1 === HMMMOperandType.UNSIGNED_NUMBER) {
+    if (instr.operand2 || hasNumericalArg) {
         mask &= 0b1111_1111_0000_1111;
     }
 
-    if (instr.operand3 || instr.operand2 === HMMMOperandType.SIGNED_NUMBER || instr.operand2 === HMMMOperandType.UNSIGNED_NUMBER) {
+    if (instr.operand3 || hasNumericalArg) {
         mask &= 0b1111_1111_1111_0000;
     }
 
