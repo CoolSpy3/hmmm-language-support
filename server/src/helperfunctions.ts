@@ -2,7 +2,9 @@ import { Position, TextDocument } from 'vscode-languageserver-textdocument';
 import {
     CompletionItemKind,
     CompletionList,
+    DocumentFormattingParams,
     Range,
+    TextEdit,
     uinteger
 } from 'vscode-languageserver/node';
 import { getInstructionRepresentation, getInstructionSignature, hmmmInstructions, preprocessLine } from '../../hmmm-spec/out/hmmm';
@@ -44,6 +46,29 @@ export function getSelectedWord(document: TextDocument, position: Position): [st
  */
 export function getRangeForLine(line: number): Range {
     return Range.create(line, uinteger.MIN_VALUE, line, uinteger.MAX_VALUE);
+}
+
+export function applyTrailingNewlineEdits(params: DocumentFormattingParams, document: TextDocument): TextEdit | undefined {
+    if (params.options.insertFinalNewline || params.options.trimFinalNewlines) {
+        let numTrailingNewLines = 0;
+
+        for (let i = document.lineCount - 1; i >= 0; i--) {
+            const line = document.getText(getRangeForLine(i));
+
+            if (!line.trim()) numTrailingNewLines++;
+            else break;
+        }
+
+        if (params.options.insertFinalNewline && numTrailingNewLines === 0) {
+            // Add a newline to the end of the document if it doesn't already have one
+           return TextEdit.insert(document.positionAt(document.getText().length), '\n');
+        } else if (params.options.trimFinalNewlines && numTrailingNewLines > 1) {
+            // Remove any newlines at the end of the document
+            return TextEdit.del(Range.create(document.lineCount - numTrailingNewLines, uinteger.MIN_VALUE, document.lineCount, uinteger.MIN_VALUE));
+        }
+    }
+
+    return undefined;
 }
 
 //#endregion

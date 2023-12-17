@@ -77,6 +77,7 @@ export function getInstructionByName(name: string): HMMMInstruction | undefined 
 const operandRegex = /(?:(\S+)(?:\s+|$))?/gm;
 const lastOperandRegex = /(?:(\S+)\s*)?/gm;
 export const instructionRegex = RegExp(`^\\s*${operandRegex.source}${operandRegex.source}${operandRegex.source}${operandRegex.source}${lastOperandRegex.source}(?:\\s+(.+))?$`, 'md');
+export const binaryRegex = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d;
 
 export enum InstructionPart {
     FULL_LINE = 0,

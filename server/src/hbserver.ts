@@ -4,6 +4,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import {
     Diagnostic,
     DiagnosticSeverity,
+    DocumentFormattingParams,
     InitializeParams,
     InlayHint,
     InlayHintParams,
@@ -13,11 +14,12 @@ import {
     SemanticTokensParams,
     TextDocumentSyncKind,
     TextDocuments,
+    TextEdit,
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
-import { HMMMOperandType, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
-import { getRangeForLine } from "./helperfunctions";
+import { HMMMOperandType, binaryRegex, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
+import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
 const connection = createConnection(ProposedFeatures.all)
@@ -28,6 +30,7 @@ connection.onInitialize((params: InitializeParams) => {
         // Tell the client what we can do
         capabilities: {
             textDocumentSync: TextDocumentSyncKind.Incremental,
+            documentFormattingProvider: true,
             inlayHintProvider: true,
             semanticTokensProvider: {
                 legend: computeLegend(params.capabilities.textDocument?.semanticTokens!),
@@ -128,7 +131,7 @@ connection.languages.semanticTokens.on(
 
             // Try to match the different parts of the instruction
             let m: RegExpExecArray | null;
-            if(!(m = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d.exec(line))?.indices) continue; // If the line doesn't match the regex, skip it
+            if(!(m = binaryRegex.exec(line))?.indices) continue; // If the line doesn't match the regex, skip it
 
             // Highlight the instruction
             tokenBuilder.push(i, m.indices[1][0], 4, TokenTypes.keyword, 0);
@@ -203,6 +206,36 @@ connection.languages.semanticTokens.on(
         }
 
         return tokenBuilder.build();
+    }
+);
+
+connection.onDocumentFormatting(
+    (params: DocumentFormattingParams): TextEdit[] => {
+        /*
+            Format the document
+        */
+
+        let document = documents.get(params.textDocument.uri);
+
+        if(!document) return []; // If the document doesn't exist, return an empty array
+
+        let edits: TextEdit[] = [];
+
+        for(let i = 0; i < document.lineCount; i++) {
+            const line = document.getText(getRangeForLine(i)).trim();
+
+            const formattedLine = line.replace(binaryRegex, "$1 $2 $3 $4");
+
+            if(line !== formattedLine) edits.push({
+                range: getRangeForLine(i),
+                newText: formattedLine
+            });
+        }
+
+        const trailingNewlineEdit = applyTrailingNewlineEdits(params, document);
+        if(trailingNewlineEdit) edits.push(trailingNewlineEdit);
+
+        return edits;
     }
 );
 

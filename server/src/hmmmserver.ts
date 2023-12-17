@@ -37,6 +37,7 @@ import {
     validateOperand
 } from '../../hmmm-spec/out/hmmm';
 import {
+    applyTrailingNewlineEdits,
     getExpectedInstructionNumber,
     getRangeForLine,
     getSelectedWord,
@@ -362,7 +363,7 @@ connection.onCodeAction(
             // Get the cause of the diagnostic
             const errorCode = diagnostic.data as HMMMErrorType;
 
-            switch(errorCode) {
+            switch (errorCode) {
                 case HMMMErrorType.INCORRECT_LINE_NUM: // The line number is incorrect, so suggest changing it to the expected line number
                     {
                         const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
@@ -442,10 +443,10 @@ connection.onCompletion(
         const indices = m.indices;
         const position = params.position.character;
 
-        if(isInIndexRange(position, InstructionPart.OTHER, indices)) return completionList; // The cursor is at the end of the line, so don't suggest anything
+        if (isInIndexRange(position, InstructionPart.OTHER, indices)) return completionList; // The cursor is at the end of the line, so don't suggest anything
 
-        if(isInIndexRange(position, InstructionPart.LINE_NUM, indices)) {
-             // The cursor is in the line number, so suggest the next line number
+        if (isInIndexRange(position, InstructionPart.LINE_NUM, indices)) {
+            // The cursor is in the line number, so suggest the next line number
             populateLineNumber(completionList, params.position.line, document);
             return completionList;
         }
@@ -497,10 +498,10 @@ connection.onDefinition(
         const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
-        if(commentPos != -1 && params.position.character >= commentPos) return []; // The cursor is in a comment, so don't return anything
+        if (commentPos != -1 && params.position.character >= commentPos) return []; // The cursor is in a comment, so don't return anything
 
         const spacePos = line.indexOf(' ');
-        if(spacePos != -1 && params.position.character <= spacePos) return []; // The cursor is before the instruction, so don't return anything
+        if (spacePos != -1 && params.position.character <= spacePos) return []; // The cursor is before the instruction, so don't return anything
 
         const word = getSelectedWord(document, params.position)[0]; // Get the word at the cursor
 
@@ -514,7 +515,7 @@ connection.onDefinition(
 
         const instruction = m[InstructionPart.INSTRUCTION];
 
-        if(!(instruction.toLowerCase().startsWith("j") || instruction.toLowerCase().startsWith("call"))) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
+        if (!(instruction.toLowerCase().startsWith("j") || instruction.toLowerCase().startsWith("call"))) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
 
         // Assume the number represents a line number that is being jumped to. Return all lines with a matching instruction number
 
@@ -524,7 +525,7 @@ connection.onDefinition(
             // Get the line and remove anything that's not an instruction number
             const line = preprocessDocumentLine(document, i).trim().split(/\s+/)[0];
 
-            if(!line) continue; // Skip empty lines
+            if (!line) continue; // Skip empty lines
 
             // Try to parse the instruction number
             const num = parseInt(line);
@@ -537,7 +538,7 @@ connection.onDefinition(
         }
 
         // There were no matching lines. Return the current line, so the user receives "No definition found"
-        if(!definitions.length) return [{ uri: params.textDocument.uri, range: getRangeForLine(params.position.line) }];
+        if (!definitions.length) return [{ uri: params.textDocument.uri, range: getRangeForLine(params.position.line) }];
 
         return definitions;
     }
@@ -605,7 +606,7 @@ connection.onDocumentFormatting(
             const line = originalLine.trim(); // Remove any leading/trailing whitespace
             const commentStartPos = line.indexOf('#');
 
-            if(commentStartPos == 0) {
+            if (commentStartPos == 0 || !line) {
                 // The line does not contain any instructions, so remove any leading/trailing whitespace
                 edits.push(TextEdit.replace(getRangeForLine(i), line));
                 continue;
@@ -638,12 +639,17 @@ connection.onDocumentFormatting(
                 return maxLen === 0 ? '' : ' ';
             }
 
+            const comment = commentStartPos != -1 ? line.slice(commentStartPos) : '';
+
             // Format the line
-            const formattedLine = `${lineNumNum.toString().padStart(maxLineNumLen, '0')} ${m[InstructionPart.INSTRUCTION]}${' '.repeat(instructionSpaces)}${spaceBetween(maxOperand1Len)}${m[InstructionPart.OPERAND1] ?? ''}${' '.repeat(operand1Spaces)}${spaceBetween(maxOperand2Len)}${m[InstructionPart.OPERAND2] ?? ''}${' '.repeat(operand2Spaces)}${spaceBetween(maxOperand3Len)}${m[InstructionPart.OPERAND3] ?? ''}${' '.repeat(operand3Spaces)} ${m[InstructionPart.OTHER]}${m[InstructionPart.OTHER] ? ' ' : ''}${line.slice(commentStartPos)}`.trim();
+            const formattedLine = `${lineNumNum.toString().padStart(maxLineNumLen, '0')} ${m[InstructionPart.INSTRUCTION] ?? ''}${' '.repeat(instructionSpaces)}${spaceBetween(maxOperand1Len)}${m[InstructionPart.OPERAND1] ?? ''}${' '.repeat(operand1Spaces)}${spaceBetween(maxOperand2Len)}${m[InstructionPart.OPERAND2] ?? ''}${' '.repeat(operand2Spaces)}${spaceBetween(maxOperand3Len)}${m[InstructionPart.OPERAND3] ?? ''}${' '.repeat(operand3Spaces)} ${m[InstructionPart.OTHER] ?? ''}${m[InstructionPart.OTHER] ? ' ' : ''}${comment}`.trim();
 
             // Add the edit to the list of edits
-            if(formattedLine !== originalLine) edits.push(TextEdit.replace(getRangeForLine(i), formattedLine));
+            if (formattedLine !== originalLine) edits.push(TextEdit.replace(getRangeForLine(i), formattedLine));
         }
+
+        const trailingNewlineEdit = applyTrailingNewlineEdits(params, document);
+        if(trailingNewlineEdit) edits.push(trailingNewlineEdit);
 
         return edits;
     }
@@ -663,13 +669,13 @@ connection.onHover(
         const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
-        if(commentPos != -1 && params.position.character >= commentPos) return { contents: [] }; // The cursor is in a comment, so don't return anything
+        if (commentPos != -1 && params.position.character >= commentPos) return { contents: [] }; // The cursor is in a comment, so don't return anything
 
         const word = getSelectedWord(document, params.position); // Get the word at the cursor
 
         const instruction = getInstructionByName(word[0]); // Try to interpret the word as an instruction
 
-        if(instruction) { // The word is an instruction, show the instruction description
+        if (instruction) { // The word is an instruction, show the instruction description
             return {
                 contents: {
                     kind: MarkupKind.PlainText,
@@ -679,9 +685,9 @@ connection.onHover(
             };
         }
 
-        if(/^r(\d|1[0-5])$/i.test(word[0])) { // Try to interpret the word as a register
+        if (/^r(\d|1[0-5])$/i.test(word[0])) { // Try to interpret the word as a register
             // Show the register description
-            if(word[0] === 'r0') {
+            if (word[0] === 'r0') {
                 return {
                     contents: {
                         kind: MarkupKind.Markdown,
@@ -690,7 +696,7 @@ connection.onHover(
                     range: word[1]
                 };
             }
-            if(word[0] === 'r13') {
+            if (word[0] === 'r13') {
                 return {
                     contents: {
                         kind: MarkupKind.Markdown,
@@ -699,7 +705,7 @@ connection.onHover(
                     range: word[1]
                 };
             }
-            if(word[0] === 'r14') {
+            if (word[0] === 'r14') {
                 return {
                     contents: {
                         kind: MarkupKind.Markdown,
@@ -708,7 +714,7 @@ connection.onHover(
                     range: word[1]
                 };
             }
-            if(word[0] === 'r15') {
+            if (word[0] === 'r15') {
                 return {
                     contents: {
                         kind: MarkupKind.Markdown,
@@ -744,10 +750,10 @@ connection.onReferences(
         const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
-        if(commentPos != -1 && params.position.character >= commentPos) return undefined; // The cursor is in a comment, so don't return anything
+        if (commentPos != -1 && params.position.character >= commentPos) return undefined; // The cursor is in a comment, so don't return anything
 
         const spacePos = line.indexOf(' ');
-        if(spacePos != -1 && params.position.character > spacePos) return undefined; // The cursor is after the instruction, so don't return anything
+        if (spacePos != -1 && params.position.character > spacePos) return undefined; // The cursor is after the instruction, so don't return anything
 
         const word = getSelectedWord(document, params.position); // Get the word at the cursor
 
@@ -763,14 +769,14 @@ connection.onReferences(
             // Get the line and remove anything that's not an instruction number
             const line = preprocessDocumentLine(document, i);
 
-            if(!line) continue; // Skip empty lines
+            if (!line) continue; // Skip empty lines
 
             // Try to parse the instruction number
             let m: RegExpMatchArray | null;
             if (!(m = instructionRegex.exec(line))) continue;
 
-            if(!m.indices) { // The regex failed to get the indices, so just check if the line contains the line number
-                if(line.slice(line.indexOf(' ')).includes(lineNum.toString())) {
+            if (!m.indices) { // The regex failed to get the indices, so just check if the line contains the line number
+                if (line.slice(line.indexOf(' ')).includes(lineNum.toString())) {
                     locations.push({
                         uri: params.textDocument.uri,
                         range: getRangeForLine(i)
@@ -780,12 +786,12 @@ connection.onReferences(
             }
 
             // Check if the instruction is a jump or call
-            if(!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue;
+            if (!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue;
 
             // If it is, check if either of the operands are the line number
-            if(m[InstructionPart.OPERAND1]) {
+            if (m[InstructionPart.OPERAND1]) {
                 const operand1 = m[InstructionPart.OPERAND1];
-                if(parseInt(operand1) === lineNum) {
+                if (parseInt(operand1) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
                         range: getRangeForLine(i)
@@ -793,9 +799,9 @@ connection.onReferences(
                 }
             }
 
-            if(m[InstructionPart.OPERAND2]) {
+            if (m[InstructionPart.OPERAND2]) {
                 const operand2 = m[InstructionPart.OPERAND2];
-                if(parseInt(operand2) === lineNum) {
+                if (parseInt(operand2) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
                         range: getRangeForLine(i)
