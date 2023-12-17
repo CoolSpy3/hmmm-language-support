@@ -26,8 +26,8 @@
 					"match": "\\b(halt|read|write|nop|setn|addn|copy|add|sub|neg|mul|div|mod|jumpn|jumpr|jeqzn|jnezn|jgtzn|jltzn|calln|pushr|popr|loadn|storen|loadr|storer)\\b"
 				},
 				{
-					"name": "keyword.control.hmmm.extended",
-					"match": "\\b(set|in|out|jeqz|jnez|jltz|jgtz|jz|jnz|jl|jg|jmpn|jmpr|jmp|call|ret|jump|store|load|push|pop)\\b"
+					"name": "keyword.control.hmmm.alias",
+					"match": "\\b(mov|jump|jeqz|jnez|jgtz|jltz|call|loadi|load|storei|store)\\b"
 				}
 			]
 		},
