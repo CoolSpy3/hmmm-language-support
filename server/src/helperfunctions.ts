@@ -29,12 +29,21 @@ export function isInIndexRange(value: number, index: number, indices: RegExpIndi
  * @returns The word at the given position and the range of the word
  */
 export function getSelectedWord(document: TextDocument, position: Position): [string, Range] {
-    const line = document.getText(Range.create(position.line, uinteger.MIN_VALUE, position.line, uinteger.MAX_VALUE)); // Get the whole line
+    const line = document.getText(getRangeForLine(position.line)); // Get the whole line
     // Set the range to the given position (0 width)
     let wordRange = Range.create(position.line, position.character, position.line, position.character); // Copy position so start and end don't point to the same object
     while (wordRange.start.character > 0 && !/\s/.test(line[wordRange.start.character - 1])) wordRange.start.character--; // Move the start of the range to the beginning of the word
     while (wordRange.end.character < line.length && !/\s/.test(line[wordRange.end.character])) wordRange.end.character++; // Move the end of the range to the end of the word
     return [line.slice(wordRange.start.character, wordRange.end.character), wordRange]; // Return the word and the range
+}
+
+/**
+ * Creates a range which spans the entire line
+ * @param line The line number to create the range for
+ * @returns A range which spans the entire line
+ */
+export function getRangeForLine(line: number): Range {
+    return Range.create(line, uinteger.MIN_VALUE, line, uinteger.MAX_VALUE);
 }
 
 //#endregion
@@ -69,7 +78,7 @@ export function getExpectedInstructionNumber(lineNumber: number, document: TextD
 
     for(let i = 0; i < lineNumber; i++) { // Loop through all the lines before the given line
         // Get the line and remove any comments
-        const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+        const line = preprocessDocumentLine(document, i);
 
         if (!line.trim()) continue; // Skip empty lines
 
@@ -137,7 +146,7 @@ export function populateRegisters(completionList: CompletionList) {
  */
 
 export function preprocessDocumentLine(document: TextDocument, line: number) {
-    return preprocessLine(document.getText(Range.create(line, uinteger.MIN_VALUE, line, uinteger.MAX_VALUE)));
+    return preprocessLine(document.getText(getRangeForLine(line)));
 }
 
 //#endregion

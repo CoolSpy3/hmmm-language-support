@@ -9,6 +9,7 @@ import {
     DefinitionParams,
     Diagnostic,
     DiagnosticSeverity,
+    DocumentFormattingParams,
     Hover,
     HoverParams,
     InitializeParams,
@@ -32,10 +33,12 @@ import {
     InstructionPart,
     getInstructionByName,
     instructionRegex,
+    preprocessLine,
     validateOperand
 } from '../../hmmm-spec/out/hmmm';
 import {
     getExpectedInstructionNumber,
+    getRangeForLine,
     getSelectedWord,
     isInIndexRange, populateInstructions, populateLineNumber, populateRegisters,
     preprocessDocumentLine,
@@ -56,6 +59,7 @@ connection.onInitialize((params: InitializeParams) => {
                 triggerCharacters: [' ', '\n']
             },
             definitionProvider: true,
+            documentFormattingProvider: true,
             hoverProvider: true,
             referencesProvider: true
         }
@@ -121,7 +125,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
             // If the regex fails to match, add an error diagnostic (The regex is pretty general, so this shouldn't happen)
             diagnostics.push({
                 severity: DiagnosticSeverity.Error,
-                range: Range.create(lineIdx, uinteger.MIN_VALUE, lineIdx, uinteger.MAX_VALUE),
+                range: getRangeForLine(lineIdx),
                 message: `Invalid line!`,
                 source: 'HMMM Language Server',
                 data: HMMMErrorType.INVALID_LINE
@@ -339,6 +343,62 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
+connection.onCodeAction(
+    (params: CodeActionParams): CodeAction[] => {
+        /*
+            Suggest fixes for errors. Currently, this is only line numbers, but it could be expanded to other errors in the future (e.g. n vs r variants of instructions)
+        */
+
+        let actions: CodeAction[] = [];
+        params.context.diagnostics.forEach(diagnostic => {
+            if (diagnostic.source !== 'HMMM Language Server') return; // Only handle diagnostics from the HMMM Language Server
+
+            const document = documents.get(params.textDocument.uri);
+            if (!document) return; // We can't read the document, so just return
+
+            // Get the line and remove any comments
+            const line = preprocessDocumentLine(document, diagnostic.range.start.line);
+
+            // Get the cause of the diagnostic
+            const errorCode = diagnostic.data as HMMMErrorType;
+
+            switch(errorCode) {
+                case HMMMErrorType.INCORRECT_LINE_NUM: // The line number is incorrect, so suggest changing it to the expected line number
+                    {
+                        const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
+                        actions.push({
+                            title: `Change Line Number to ${correctLineNum}`,
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, correctLineNum.toString())]
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case HMMMErrorType.MISSING_LINE_NUM: // The line number is missing, so suggest adding it
+                    {
+                        const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
+                        actions.push({
+                            title: 'Add Line Number',
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)) /* Replace the start of the line to the first non-space character */, correctLineNum.toString() + ' ')]
+                                }
+                            }
+                        });
+                        break;
+                    }
+            }
+        });
+        return actions;
+    }
+);
+
 connection.onCompletion(
     (params: CompletionParams): CompletionList => {
         /*
@@ -434,7 +494,7 @@ connection.onDefinition(
 
         if (!document) return []; // We can't read the document, so just return an empty array
 
-        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
+        const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
         if(commentPos != -1 && params.position.character >= commentPos) return []; // The cursor is in a comment, so don't return anything
@@ -471,15 +531,121 @@ connection.onDefinition(
             if (num === lineNum) { // The instruction number matches the number we're looking for
                 definitions.push({ // Add the line to the definitions
                     uri: params.textDocument.uri,
-                    range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                    range: getRangeForLine(i)
                 });
             }
         }
 
         // There were no matching lines. Return the current line, so the user receives "No definition found"
-        if(!definitions.length) return [{ uri: params.textDocument.uri, range: Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE) }];
+        if(!definitions.length) return [{ uri: params.textDocument.uri, range: getRangeForLine(params.position.line) }];
 
         return definitions;
+    }
+);
+
+connection.onDocumentFormatting(
+    (params: DocumentFormattingParams): TextEdit[] => {
+        /**
+         * Format the document so all parts of each instruction are aligned
+         */
+
+        const document = documents.get(params.textDocument.uri);
+
+        if (!document) return []; // We can't read the document, so just return an empty array
+
+        let maxLineNumLen = 0;
+        let maxInstructionLen = 0;
+        let maxOperand1Len = 0;
+        let maxOperand2Len = 0;
+        let maxOperand3Len = 0;
+
+        // Loop through all the lines in the document to find the longest line number, instruction, and operands
+
+        for (let i = 0; i < document.lineCount; i++) {
+            // Get the line and remove any comments and leading/trailing whitespace
+            const line = preprocessDocumentLine(document, i).trim();
+
+            if (!line) continue; // Skip empty lines
+
+            // Try to match the line to the instruction regex
+            let m: RegExpMatchArray | null;
+            if (!(m = instructionRegex.exec(line))) continue; // The line is not an instruction, so skip it
+
+            let lineNumNum = parseInt(m[InstructionPart.LINE_NUM]);
+
+            if (isNaN(lineNumNum)) {
+                // Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
+                m = instructionRegex.exec(`0 ${line}`) ?? m;
+                lineNumNum = 0;
+            }
+
+            const lineNumLen = lineNumNum.toString().length ?? 0;
+            const instructionLen = m[InstructionPart.INSTRUCTION]?.length ?? 0;
+            const operand1Len = m[InstructionPart.OPERAND1]?.length ?? 0;
+            const operand2Len = m[InstructionPart.OPERAND2]?.length ?? 0;
+            const operand3Len = m[InstructionPart.OPERAND3]?.length ?? 0;
+
+            // Update the max lengths
+            if (lineNumLen > maxLineNumLen) maxLineNumLen = lineNumLen;
+            if (instructionLen > maxInstructionLen) maxInstructionLen = instructionLen;
+            if (operand1Len > maxOperand1Len) maxOperand1Len = operand1Len;
+            if (operand2Len > maxOperand2Len) maxOperand2Len = operand2Len;
+            if (operand3Len > maxOperand3Len) maxOperand3Len = operand3Len;
+        }
+
+        let edits: TextEdit[] = [];
+
+        // Loop through all the lines in the document again to format them
+        for (let i = 0; i < document.lineCount; i++) {
+            // Get the line
+            const originalLine = document.getText(getRangeForLine(i));
+
+            if (!originalLine) continue; // Skip empty lines
+
+            const line = originalLine.trim(); // Remove any leading/trailing whitespace
+            const commentStartPos = line.indexOf('#');
+
+            if(commentStartPos == 0) {
+                // The line does not contain any instructions, so remove any leading/trailing whitespace
+                edits.push(TextEdit.replace(getRangeForLine(i), line));
+                continue;
+            }
+
+            // Try to match the line to the instruction regex
+            let m: RegExpMatchArray | null;
+            if (!(m = instructionRegex.exec(preprocessLine(line)))) continue; // The line is not an instruction, so skip it
+
+            let lineNumNum = parseInt(m[InstructionPart.LINE_NUM]);
+
+            if (isNaN(lineNumNum)) {
+                // Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
+                m = instructionRegex.exec(`0 ${line}`) ?? m;
+                lineNumNum = 0;
+            }
+
+            const instructionLen = m[InstructionPart.INSTRUCTION]?.length ?? 0;
+            const operand1Len = m[InstructionPart.OPERAND1]?.length ?? 0;
+            const operand2Len = m[InstructionPart.OPERAND2]?.length ?? 0;
+            const operand3Len = m[InstructionPart.OPERAND3]?.length ?? 0;
+
+            // Calculate the number of spaces to add to the end of each part of the instruction
+            const instructionSpaces = maxInstructionLen - instructionLen;
+            const operand1Spaces = maxOperand1Len - operand1Len;
+            const operand2Spaces = maxOperand2Len - operand2Len;
+            const operand3Spaces = maxOperand3Len - operand3Len;
+
+            function spaceBetween(maxLen: number): string {
+                return maxLen === 0 ? '' : ' ';
+            }
+
+            // Format the line
+            const formattedLine = `${lineNumNum.toString().padStart(maxLineNumLen, '0')} ${m[InstructionPart.INSTRUCTION]}${' '.repeat(instructionSpaces)}${spaceBetween(maxOperand1Len)}${m[InstructionPart.OPERAND1] ?? ''}${' '.repeat(operand1Spaces)}${spaceBetween(maxOperand2Len)}${m[InstructionPart.OPERAND2] ?? ''}${' '.repeat(operand2Spaces)}${spaceBetween(maxOperand3Len)}${m[InstructionPart.OPERAND3] ?? ''}${' '.repeat(operand3Spaces)} ${m[InstructionPart.OTHER]}${m[InstructionPart.OTHER] ? ' ' : ''}${line.slice(commentStartPos)}`.trim();
+
+            // Add the edit to the list of edits
+            if(formattedLine !== originalLine) edits.push(TextEdit.replace(getRangeForLine(i), formattedLine));
+        }
+
+        return edits;
     }
 );
 
@@ -494,7 +660,7 @@ connection.onHover(
         if (!document) return { contents: [] }; // We can't read the document, so just return an empty array
 
         // Get the text line
-        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
+        const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
         if(commentPos != -1 && params.position.character >= commentPos) return { contents: [] }; // The cursor is in a comment, so don't return anything
@@ -575,7 +741,7 @@ connection.onReferences(
         if (!document) return undefined; // We can't read the document, so just return undefined
 
         // Get the text line
-        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE));
+        const line = document.getText(getRangeForLine(params.position.line));
 
         const commentPos = line.indexOf('#');
         if(commentPos != -1 && params.position.character >= commentPos) return undefined; // The cursor is in a comment, so don't return anything
@@ -607,7 +773,7 @@ connection.onReferences(
                 if(line.slice(line.indexOf(' ')).includes(lineNum.toString())) {
                     locations.push({
                         uri: params.textDocument.uri,
-                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                        range: getRangeForLine(i)
                     });
                 }
                 continue;
@@ -622,7 +788,7 @@ connection.onReferences(
                 if(parseInt(operand1) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
-                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                        range: getRangeForLine(i)
                     });
                 }
             }
@@ -632,7 +798,7 @@ connection.onReferences(
                 if(parseInt(operand2) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
-                        range: Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)
+                        range: getRangeForLine(i)
                     });
                 }
             }
@@ -641,62 +807,6 @@ connection.onReferences(
         }
 
         return locations;
-    }
-);
-
-connection.onCodeAction(
-    (params: CodeActionParams): CodeAction[] => {
-        /*
-            Suggest fixes for errors. Currently, this is only line numbers, but it could be expanded to other errors in the future (e.g. n vs r variants of instructions)
-        */
-
-        let actions: CodeAction[] = [];
-        params.context.diagnostics.forEach(diagnostic => {
-            if (diagnostic.source !== 'HMMM Language Server') return; // Only handle diagnostics from the HMMM Language Server
-
-            const document = documents.get(params.textDocument.uri);
-            if (!document) return; // We can't read the document, so just return
-
-            // Get the line and remove any comments
-            const line = preprocessDocumentLine(document, diagnostic.range.start.line);
-
-            // Get the cause of the diagnostic
-            const errorCode = diagnostic.data as HMMMErrorType;
-
-            switch(errorCode) {
-                case HMMMErrorType.INCORRECT_LINE_NUM: // The line number is incorrect, so suggest changing it to the expected line number
-                    {
-                        const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
-                        actions.push({
-                            title: `Change Line Number to ${correctLineNum}`,
-                            kind: CodeActionKind.QuickFix,
-                            diagnostics: [diagnostic],
-                            edit: {
-                                changes: {
-                                    [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, correctLineNum.toString())]
-                                }
-                            }
-                        });
-                        break;
-                    }
-                case HMMMErrorType.MISSING_LINE_NUM: // The line number is missing, so suggest adding it
-                    {
-                        const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
-                        actions.push({
-                            title: 'Add Line Number',
-                            kind: CodeActionKind.QuickFix,
-                            diagnostics: [diagnostic],
-                            edit: {
-                                changes: {
-                                    [params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)) /* Replace the start of the line to the first non-space character */, correctLineNum.toString() + ' ')]
-                                }
-                            }
-                        });
-                        break;
-                    }
-            }
-        });
-        return actions;
     }
 );
 

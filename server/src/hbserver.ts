@@ -8,7 +8,6 @@ import {
     InlayHint,
     InlayHintParams,
     ProposedFeatures,
-    Range,
     SemanticTokens,
     SemanticTokensBuilder,
     SemanticTokensParams,
@@ -18,6 +17,7 @@ import {
     uinteger
 } from "vscode-languageserver/node";
 import { HMMMOperandType, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
+import { getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
 const connection = createConnection(ProposedFeatures.all)
@@ -55,7 +55,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     let diagnostics: Diagnostic[] = [];
 
     for(let i = 0; i < textDocument.lineCount; i++) {
-        const lineRange = Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE);
+        const lineRange = getRangeForLine(i);
         const line = textDocument.getText(lineRange);
 
         const instruction = parseBinaryInstruction(line);
@@ -88,7 +88,7 @@ connection.languages.inlayHint.on(
         let hints: InlayHint[] = [];
 
         for(let i = 0; i < document.lineCount; i++) {
-            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE));
+            const line = document.getText(getRangeForLine(i));
 
             const instruction = parseBinaryInstruction(line);
 
@@ -120,7 +120,7 @@ connection.languages.semanticTokens.on(
         if(!document) return tokenBuilder.build(); // If the document doesn't exist, return an empty array
 
         for(let i = 0; i < document.lineCount; i++) {
-            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE));
+            const line = document.getText(getRangeForLine(i));
 
             const instruction = parseBinaryInstruction(line);
 
