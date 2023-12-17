@@ -17,5 +17,11 @@
 	"devDependencies": {
     "@types/node": "^20.10.4",
 		"@vscode/test-electron": "^2.3.8"
-	}
+	},
+  "references": [
+    {
+      "path": "../hmmm-spec",
+      "prepend": true
+    }
+  ]
 }

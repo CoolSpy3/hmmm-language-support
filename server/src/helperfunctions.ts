@@ -5,25 +5,7 @@ import {
     Range,
     uinteger
 } from 'vscode-languageserver/node';
-import { getInstructionRepresentation, getInstructionSignature, hmmmInstructions } from './hmmm';
-
-
-//#region Misc
-
-/**
- * Parsed a signed binary string in two's complement notation to a number
- * @param value The binary string to parse
- * @returns The parsed number
- */
-export function parseSignedInt(value: string): number {
-    if (value[0] === '1') { // Negative number
-        return parseInt(value.slice(1), 2) - 2 ** (value.length - 1);
-    } else { // Positive number
-        return parseInt(value, 2);
-    }
-}
-
-//#endregion
+import { getInstructionRepresentation, getInstructionSignature, hmmmInstructions, preprocessLine } from '../../hmmm-spec/out/hmmm';
 
 //#region VSCode
 
@@ -146,6 +128,16 @@ export function populateRegisters(completionList: CompletionList) {
         labelDetails: { description: 'Stack Pointer'},
         kind: CompletionItemKind.Variable
     });
+}
+/**
+ * Preprocesses a line of HMMM code by removing comments and trimming trailing whitespace
+ * @param document The document to read the line from
+ * @param line The line number to preprocess
+ * @returns The preprocessed line
+ */
+
+export function preprocessDocumentLine(document: TextDocument, line: number) {
+    return preprocessLine(document.getText(Range.create(line, uinteger.MIN_VALUE, line, uinteger.MAX_VALUE)));
 }
 
 //#endregion

@@ -1,5 +1,3 @@
-import { parseSignedInt } from "./helperfunctions";
-
 export enum HMMMOperandType {
     REGISTER = 1, // Without the =1, TypeScript is unhappy
     SIGNED_NUMBER,
@@ -289,4 +287,28 @@ export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | un
     }
 
     return { instruction: instr, operands: operands };
+}
+
+/**
+ * Preprocesses a line of HMMM code by removing comments and trimming trailing whitespace
+ * @param line The line to preprocess
+ * @returns The preprocessed line
+ */
+export function preprocessLine(line: string) {
+    return line.split('#')[0].trimEnd();
+}
+
+//--helper functions
+
+/**
+ * Parses a signed binary string in two's complement notation to a number
+ * @param value The binary string to parse
+ * @returns The parsed number
+ */
+function parseSignedInt(value: string): number {
+    if (value[0] === '1') { // Negative number
+        return parseInt(value.slice(1), 2) - 2 ** (value.length - 1);
+    } else { // Positive number
+        return parseInt(value, 2);
+    }
 }

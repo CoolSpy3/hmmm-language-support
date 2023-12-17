@@ -24,11 +24,6 @@ import {
     uinteger
 } from 'vscode-languageserver/node';
 import {
-    getExpectedInstructionNumber,
-    getSelectedWord,
-    isInIndexRange, populateInstructions, populateLineNumber, populateRegisters,
-} from './helperfunctions';
-import {
     HMMMDetectedOperand,
     HMMMDetectedOperandType,
     HMMMInstruction,
@@ -38,7 +33,13 @@ import {
     getInstructionByName,
     instructionRegex,
     validateOperand
-} from './hmmm';
+} from '../../hmmm-spec/out/hmmm';
+import {
+    getExpectedInstructionNumber,
+    getSelectedWord,
+    isInIndexRange, populateInstructions, populateLineNumber, populateRegisters,
+    preprocessDocumentLine,
+} from './helperfunctions';
 
 //#region Language Server Setup
 
@@ -110,7 +111,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
     for (let lineIdx = 0; lineIdx < textDocument.lineCount; lineIdx++) {
         // Get the line and remove any comments
-        const line = textDocument.getText(Range.create(lineIdx, uinteger.MIN_VALUE, lineIdx, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+        const line = preprocessDocumentLine(textDocument, lineIdx);
 
         if (!line.trim()) continue; // Skip empty lines
 
@@ -361,7 +362,7 @@ connection.onCompletion(
             return completionList;
         }
 
-        const line = document.getText(Range.create(params.position.line, uinteger.MIN_VALUE, params.position.line, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+        const line = preprocessDocumentLine(document, params.position.line);
 
         let m: RegExpMatchArray | null;
 
@@ -372,7 +373,7 @@ connection.onCompletion(
             return completionList;
         }
 
-        if (!line.trim() || !(m = instructionRegex.exec(line))?.indices || !m.indices) {
+        if (!(m = instructionRegex.exec(line))?.indices || !m.indices) {
             // The line is invalid, so suggest an instruction
             populateInstructions(completionList);
             return completionList;
@@ -461,7 +462,7 @@ connection.onDefinition(
 
         for (let i = 0; i < document.lineCount; i++) { // Loop through all the lines in the document
             // Get the line and remove anything that's not an instruction number
-            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)).split('#')[0].trim().split(/\s+/)[0];
+            const line = preprocessDocumentLine(document, i).trim().split(/\s+/)[0];
 
             if(!line) continue; // Skip empty lines
 
@@ -594,7 +595,7 @@ connection.onReferences(
 
         for (let i = 0; i < document.lineCount; i++) { // Loop through all the lines in the document
             // Get the line and remove anything that's not an instruction number
-            const line = document.getText(Range.create(i, uinteger.MIN_VALUE, i, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+            const line = preprocessDocumentLine(document, i);
 
             if(!line) continue; // Skip empty lines
 
@@ -657,7 +658,7 @@ connection.onCodeAction(
             if (!document) return; // We can't read the document, so just return
 
             // Get the line and remove any comments
-            const line = document.getText(Range.create(diagnostic.range.start.line, uinteger.MIN_VALUE, diagnostic.range.start.line, uinteger.MAX_VALUE)).split('#')[0].trimEnd();
+            const line = preprocessDocumentLine(document, diagnostic.range.start.line);
 
             // Get the cause of the diagnostic
             const errorCode = diagnostic.data as HMMMErrorType;

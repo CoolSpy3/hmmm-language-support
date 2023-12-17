@@ -17,7 +17,7 @@ import {
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
-import { HMMMOperandType, parseBinaryInstruction } from "./hmmm";
+import { HMMMOperandType, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
 const connection = createConnection(ProposedFeatures.all)
