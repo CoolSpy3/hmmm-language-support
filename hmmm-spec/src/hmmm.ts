@@ -192,12 +192,12 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     return rep;
 }
 
-interface ParsedHMMMOperand {
+export interface ParsedHMMMOperand {
     type: HMMMOperandType;
     value: number;
 }
 
-interface ParsedHMMMInstruction {
+export interface ParsedHMMMInstruction {
     instruction: HMMMInstruction;
     operands: ParsedHMMMOperand[];
 }
@@ -232,17 +232,26 @@ export function getInstructionMask(instr: HMMMInstruction): number {
 
 /**
  * Parses an instruction from its binary representation
- * @param line The line to parse
+ * @param instruction The line to parse
  * @returns The parsed instruction
  */
-export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | undefined {
-    // Remove all whitespace from the line and ensure it only contains binary
-    line = line.replace(/[^01]/g, '');
-
-    if (line.length !== 16) return undefined; // Invalid instruction! It should be 16 bits long
-
+export function parseBinaryInstruction(instruction: string | number): ParsedHMMMInstruction | undefined {
     // Get the instruction
-    const opcode = parseInt(line, 2);
+    let opcode: number;
+    let line: string;
+    if(typeof instruction === 'string') {
+        // Remove all whitespace from the line and ensure it only contains binary
+        instruction = instruction.replace(/[^01]/g, '');
+
+        if (instruction.length !== 16) return undefined; // Invalid instruction! It should be 16 bits long
+
+        opcode = parseInt(instruction, 2);
+        line = instruction;
+    } else {
+        opcode = instruction;
+        line = instruction.toString(2).padStart(16, '0');
+    }
+
     const instructions = hmmmInstructions.filter(instr => ((instr.opcode ^ opcode) & instr.mask) === 0);
 
     if (!instructions.length) return undefined; // Invalid instruction!
@@ -291,12 +300,125 @@ export function parseBinaryInstruction(line: string): ParsedHMMMInstruction | un
 }
 
 /**
+ * Decompiles an instruction to HMMM code
+ * @param instruction The instruction to decompile
+ * @returns The decompiled instruction
+ */
+export function decompileInstruction(instruction: string | number | ParsedHMMMInstruction): string | undefined {
+    if(typeof instruction === 'string' || typeof instruction === 'number') {
+        const parsedInstruction = parseBinaryInstruction(instruction);
+
+        if(!parsedInstruction) return undefined;
+
+        instruction = parsedInstruction;
+    }
+    return `${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === HMMMOperandType.REGISTER ? 'r' : ''}${operand.value}`).join(', ')}`;
+}
+
+/**
  * Preprocesses a line of HMMM code by removing comments and trimming trailing whitespace
  * @param line The line to preprocess
  * @returns The preprocessed line
  */
 export function preprocessLine(line: string) {
     return line.split('#')[0].trimEnd();
+}
+
+/**
+ * Compiles HMMM code to binary
+ * @param code The code to compile
+ * @returns The compiled code and a map of instruction numbers to source line numbers or undefined if the code is invalid
+ */
+export function compile(code: string[]): [string[], Map<number, number>] | undefined {
+    const compiledCode: string[] = [];
+    const lineMap = new Map<number, number>();
+
+    let numCodeLines = 0;
+
+    for (let i = 0; i < code.length; i++) {
+        const line = preprocessLine(code[i]).trim();
+
+        if(!line) continue; // Skip empty lines
+
+        let m: RegExpExecArray | null;
+        if(!(m = instructionRegex.exec(line)) || m[InstructionPart.OTHER]) return undefined; // Invalid instruction!
+
+        lineMap.set(numCodeLines, i);
+
+        numCodeLines++;
+
+        if(parseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
+
+        const instr = getInstructionByName(m[InstructionPart.INSTRUCTION]);
+
+        if(!instr) return undefined; // Invalid instruction!
+
+        let binary = instr.opcode;
+
+        if(instr.operand1) {
+            const operand = validateOperand(m[InstructionPart.OPERAND1]);
+
+            if(operand === undefined) return undefined; // Invalid operand!
+
+            switch(instr.operand1) {
+                case HMMMOperandType.REGISTER:
+                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND1].slice(1)) << 8;
+                    break;
+                case HMMMOperandType.SIGNED_NUMBER:
+                    if(!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
+                    break;
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    if(!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
+                    break;
+            }
+        } else if(m[InstructionPart.OPERAND1]) return undefined; // Invalid operand!
+
+        if(instr.operand2) {
+            const operand = validateOperand(m[InstructionPart.OPERAND2]);
+
+            if(operand === undefined) return undefined; // Invalid operand!
+
+            switch(instr.operand2) {
+                case HMMMOperandType.REGISTER:
+                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND2].slice(1)) << 4;
+                    break;
+                case HMMMOperandType.SIGNED_NUMBER:
+                    if(!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
+                    break;
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    if(!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
+                    break;
+            }
+        } else if(m[InstructionPart.OPERAND2]) return undefined; // Invalid operand!
+
+        if(instr.operand3) {
+            const operand = validateOperand(m[InstructionPart.OPERAND3]);
+
+            if(operand === undefined) return undefined; // Invalid operand!
+
+            switch(instr.operand3) {
+                case HMMMOperandType.REGISTER:
+                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    binary |= parseInt(m[InstructionPart.OPERAND3].slice(1));
+                    break;
+                case HMMMOperandType.SIGNED_NUMBER:
+                case HMMMOperandType.UNSIGNED_NUMBER:
+                    // All numbers are represented with 8 bits, so the third argument cannot be a number
+                    console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
+                    return undefined;
+            }
+        } else if(m[InstructionPart.OPERAND3]) return undefined; // Invalid operand!
+
+        compiledCode.push(binary.toString(2).padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4"));
+    }
+
+    return [compiledCode, lineMap];
 }
 
 //--helper functions

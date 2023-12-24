@@ -18,7 +18,7 @@ import {
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
-import { HMMMOperandType, binaryRegex, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
+import { HMMMOperandType, binaryRegex, decompileInstruction, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
 import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
@@ -97,7 +97,7 @@ connection.languages.inlayHint.on(
 
             if(instruction) {
                 hints.push({
-                    label: ` ${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === HMMMOperandType.REGISTER ? 'r' : ''}${operand.value}`).join(', ')}`,
+                    label: ` ${decompileInstruction(instruction)}`,
                     position: {
                         line: i,
                         character: uinteger.MAX_VALUE
