@@ -6,20 +6,28 @@ import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
 import { window, workspace } from 'vscode';
 import { HMMMOperandType, ParsedHMMMInstruction, binaryRegex, compile, decompileInstruction, parseBinaryInstruction, preprocessLine } from '../../hmmm-spec/out/hmmm';
-import { sliceWithCount } from './debugadapter';
+import { removeDuplicates, sliceWithCount } from './debugadapter';
 
-interface ExecutedInstruction {
+export interface ExecutedInstruction {
+	id: number;
 	address: number;
 	oldData?: number;
 	didCreateStackFrame: boolean;
 }
 
-interface HMMMState {
+export interface HMMMState {
 	instructionPointer: number;
 	instruction: number;
 	registers: number[];
 	memory: number[];
 	modifiedMemory: Set<number>;
+	lastExecutedInstructionId?: number;
+}
+
+interface StateAccess {
+	address: number;
+	dataType: "register" | "memory";
+	accessType: "read" | "write";
 }
 
 /**
@@ -86,7 +94,10 @@ export class HMMMRuntime extends EventEmitter {
 	// so that the frontend can match events with breakpoints.
 	private _breakpointId = 1;
 
-	private _breakAddresses = new Set<string>();
+	private _registerReadBreakpoints = new Map<number, number>();
+	private _registerWriteBreakpoints = new Map<number, number>();
+	private _memoryReadBreakpoints = new Map<number, number>();
+	private _memoryWriteBreakpoints = new Map<number, number>();
 
 	private _enabledExceptions = new Map<string, number>();
 	private _exception: string = "";
@@ -99,6 +110,7 @@ export class HMMMRuntime extends EventEmitter {
 	private _stackEnabled = false;
 	private _maxStackDepth: number = 0;
 
+	private _instructionId = 1;
 	private _instructionLog = new Array<ExecutedInstruction>();
 	private _instructionLogEnabled = false;
 	private _maxInstructionLogLength: number = 0;
@@ -211,21 +223,35 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public restartFrame(frameId: number) {
-		if(frameId === 0) {
+		if(frameId === -1) {
 			this.sendEvent('stop', 'restart');
 			return;
 		}
-		const frame = this._stack[frameId-1];
-		if(!frame) return;
+		const frame = this._stack[frameId];
+		if(!frame) {
+			this.sendEvent('stop', 'restart');
+			return;
+		}
 
 		this._instructionPointer = frame.instructionPointer;
 		this._registers = [...frame.registers];
 		this._memory = [...frame.memory];
 		this._modifiedMemory = new Set(frame.modifiedMemory);
 		this._stack = this._stack.slice(0, frameId);
+		if(frame.lastExecutedInstructionId) {
+			while(this._instructionLog.length > 0 && this._instructionLog[0].id !== frame.lastExecutedInstructionId) {
+				this._instructionLog.shift();
+			}
+		} else {
+			this._instructionLog = [];
+		}
+
+		this.sendEvent('stop', 'restart');
 	}
 
 	public goto(instruction: number) {
+		this.createStackFrame();
+		this.updateInstructionLog(true);
 		this._instructionPointer = instruction;
 		this.sendEvent('stop', 'goto');
 	}
@@ -236,7 +262,8 @@ export class HMMMRuntime extends EventEmitter {
 			instruction: this._memory[this._instructionPointer],
 			registers: [...this._registers],
 			memory: [...this._memory],
-			modifiedMemory: new Set(this._modifiedMemory)
+			modifiedMemory: new Set(this._modifiedMemory),
+			lastExecutedInstructionId: this._instructionLog.length > 0 ? this._instructionLog[0].id : undefined,
 		};
 	}
 
@@ -305,7 +332,7 @@ export class HMMMRuntime extends EventEmitter {
 	/*
 	 * Clear breakpoint in file with given line.
 	 */
-	public clearBreakPoint(path: string, line: number) : DebugProtocol.Breakpoint | undefined {
+	public clearBreakpoint(path: string, line: number) : DebugProtocol.Breakpoint | undefined {
 		if(this._sourceFile && this._sourceFile !== path) return; // We've finalized the source file, so don't bother with breakpoints in other files
 
 		let bps = this._sourceBreakpoints.get(path);
@@ -333,19 +360,34 @@ export class HMMMRuntime extends EventEmitter {
 	/*
 	 * Set data breakpoint.
 	 */
-	public setDataBreakpoint(address: string): boolean {
-		if (address) {
-			this._breakAddresses.add(address);
-			return true;
+	public setDataBreakpoint(address: number, type: "register" | "memory", onRead: boolean, onWrite: boolean): number {
+		const id = this._breakpointId++;
+		if(type === "register") {
+			if(onRead) {
+				this._registerReadBreakpoints.set(address, id);
+			}
+			if(onWrite) {
+				this._registerWriteBreakpoints.set(address, id);
+			}
+		} else {
+			if(onRead) {
+				this._memoryReadBreakpoints.set(address, id);
+			}
+			if(onWrite) {
+				this._memoryWriteBreakpoints.set(address, id);
+			}
 		}
-		return false;
+		return id;
 	}
 
 	/*
 	 * Clear all data breakpoints.
 	 */
 	public clearAllDataBreakpoints(): void {
-		this._breakAddresses.clear();
+		this._registerReadBreakpoints.clear();
+		this._registerWriteBreakpoints.clear();
+		this._memoryReadBreakpoints.clear();
+		this._memoryWriteBreakpoints.clear();
 	}
 
 	public setExceptionBreakpoints(enabledExceptions: Array<string>): DebugProtocol.Breakpoint[] {
@@ -398,6 +440,146 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	// private methods
+
+	private determineAccesses(): StateAccess[] {
+		const parsedInstruction = this.getCurrentInstruction();
+		if(!parsedInstruction) return [];
+		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
+
+		const accesses: StateAccess[] = [{ address: this._instructionPointer, dataType: "memory", accessType: "read" }];
+		switch(instruction.instruction.name) {
+			case "halt":
+			case "nop":
+			case "jumpn":
+				break;
+			case "write":
+			case "jumpr":
+			case "jeqzn":
+			case "jnezn":
+			case "jgtzn":
+			case "jltzn":
+				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				break;
+			case "read":
+			case "setn":
+			case "calln":
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				break;
+			case "loadn":
+				accesses.push({ address: N!, dataType: "memory", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+			case "loadr":
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				break;
+			case "addn":
+				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				break;
+			case "add":
+			case "sub":
+			case "mul":
+			case "div":
+			case "mod":
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rZ!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				break;
+			case "neg":
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				break;
+			case "storen":
+				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				accesses.push({ address: N!, dataType: "memory", accessType: "write" });
+				break;
+			case "storer":
+				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "write" });
+				break;
+			case "popr":
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: this._registers[rY!]-1, dataType: "memory", accessType: "read" });
+				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rY!, dataType: "register", accessType: "write" });
+				break;
+			case "pushr":
+				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
+				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "write" });
+				accesses.push({ address: rY!, dataType: "register", accessType: "write" });
+				break;
+		}
+
+		return accesses;
+	}
+
+	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false): boolean {
+		if(!accesses) accesses = this.determineAccesses();
+
+		let hitBreakpoints: number[] = [];
+		for(const access of accesses) {
+			if(access.dataType === "register") {
+				if(ignoreNonCritical) continue;
+
+				if(access.accessType === "read" && this._registerReadBreakpoints.has(access.address)) {
+					hitBreakpoints.push(this._registerReadBreakpoints.get(access.address)!);
+				}
+				if(access.accessType === "write" && this._registerWriteBreakpoints.has(access.address)) {
+					hitBreakpoints.push(this._registerWriteBreakpoints.get(access.address)!);
+				}
+			} else {
+				if(access.address < 0 || access.address > 255) {
+					const message = `Instruction at ${this._instructionPointer} attempted to access invalid memory address ${access.address}!`;
+					this.onException("invalid-memory-access", message, true);
+					return true;
+				}
+
+				if(ignoreNonCritical) continue;
+
+				if(access.address < this._numInstructions) {
+					if(access.accessType === "read" && this._enabledExceptions.has("instruction-read")) {
+						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}!`;
+						if(this.onException("instruction-read", message, false)) return true;
+					} else if(access.accessType === "write" && this._enabledExceptions.has("instruction-write")) {
+						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}!`;
+						if(this.onException("instruction-write", message, false)) return true;
+					}
+				}
+
+				if(access.accessType === "read" && this._memoryReadBreakpoints.has(access.address) && !ignoreNonCritical) {
+					hitBreakpoints.push(this._memoryReadBreakpoints.get(access.address)!);
+				}
+				if(access.accessType === "write" && this._memoryWriteBreakpoints.has(access.address) && !ignoreNonCritical) {
+					hitBreakpoints.push(this._memoryWriteBreakpoints.get(access.address)!);
+				}
+			}
+		}
+
+		if(hitBreakpoints.length > 0) {
+			hitBreakpoints = hitBreakpoints.filter(removeDuplicates);
+			this.emit('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
+			return true;
+		}
+
+		return false;
+	}
+
+	private checkInstructionExecutionAccess(): boolean {
+		if(this._instructionPointer < 0 || this._instructionPointer >= this._numInstructions) {
+			if(this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment!`, false)) {
+				return true;
+			}
+		}
+
+		if(this.checkAccesses([{ accessType: "read", address: this._instructionPointer, dataType: "memory" }], true)) {
+			return true;
+		}
+
+		return false;
+	}
 
 	private loadSource(file: string) {
 		this._sourceFile = file;
@@ -462,16 +644,12 @@ export class HMMMRuntime extends EventEmitter {
 				const instructionInfo = this._instructionLog.shift()!;
 				this._instructionPointer = instructionInfo.address;
 
+				this.checkInstructionExecutionAccess();
+
 				const parsedInstruction = this.getCurrentInstruction();
 
 				if(!parsedInstruction) {
-					if(this._enabledExceptions.has("invalid-instruction")) {
-						this._exception = "invalid-instruction";
-						this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
-						this.sendEvent('stop', 'exception');
-						return;
-					}
-					this.sendEvent('end');
+					this.onInvalidInstruction();
 					return;
 				}
 
@@ -479,7 +657,7 @@ export class HMMMRuntime extends EventEmitter {
 
 				if(instructionInfo.didCreateStackFrame) {
 					if(this._stack.length === 0) {
-						this.sendEvent('debuggerOutput', 'WARNING: Stack Underflow!');
+						this.debuggerOutput('WARNING: Stack Underflow!');
 					} else {
 						this._stack.shift();
 					}
@@ -534,15 +712,16 @@ export class HMMMRuntime extends EventEmitter {
 						this.setMemory(this._registers[rY!], oldData!);
 						break;
 					default:
-						window.showErrorMessage(`Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`);
-						this.sendEvent('end');
+						this.onInvalidInstruction();
 						return;
 				}
 
 				if(this._breakpoints.has(this._instructionPointer)) {
-					this.sendEvent('stop', 'breakpoint');
+					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
 					return;
 				}
+
+				if(this.checkAccesses()) return;
 
 				if(step) {
 					this.sendEvent('stop', 'step');
@@ -558,9 +737,9 @@ export class HMMMRuntime extends EventEmitter {
 			// no more instructions
 			this.sendEvent('stop', 'entry');
 		} else {
-			for (; this._instructionPointer <= 255; this._instructionPointer++) {
+			while (this._instructionPointer < 256) {
 				if(this._breakpoints.has(this._instructionPointer)) {
-					this.sendEvent('stop', 'breakpoint');
+					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
 					return;
 				}
 
@@ -572,15 +751,11 @@ export class HMMMRuntime extends EventEmitter {
 				const parsedInstruction = this.getCurrentInstruction();
 
 				if(!parsedInstruction) {
-					if(this._enabledExceptions.has("invalid-instruction")) {
-						this._exception = "invalid-instruction";
-						this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
-						this.sendEvent('stop', 'exception');
-						return;
-					}
-					this.sendEvent('end');
+					this.onInvalidInstruction();
 					return;
 				}
+
+				if(this.checkAccesses()) return;
 
 				const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
@@ -595,7 +770,7 @@ export class HMMMRuntime extends EventEmitter {
 					case "read":
 						oldData = this._registers[rX!];
 					case "write":
-						this.sendEvent('output', this._registers[rX!], this.source, this._instructionToSourceMap.get(this._instructionPointer) ?? undefined, 0);
+						this.instructionOutput('stdout', String.fromCharCode(this._registers[rX!]));
 						return;
 					case "jumpr":
 						nextInstructionPointer = this._registers[rX!];
@@ -696,36 +871,18 @@ export class HMMMRuntime extends EventEmitter {
 						}
 						break;
 					default:
-						if(this._enabledExceptions.has("invalid-instruction")) {
-							this._exception = "invalid-instruction";
-							this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
-							this.sendEvent('stop', 'exception');
-							return;
-						}
-						this.sendEvent('end');
+						this.onInvalidInstruction();
 						return;
 				}
 
-				if(createStackFrame && this._stackEnabled) {
-					if(this._stack.length >= this._maxStackDepth) {
-						this.sendEvent('debuggerOutput', 'WARNING: Stack Overflow!');
-						this._stack.pop();
-					}
-					this._stack.splice(0, 0, this.getCurrentState());
+				if(createStackFrame) {
+					this.createStackFrame();
 				}
-				if(this._instructionLogEnabled) {
-					if(this._instructionLog.length >= this._maxInstructionLogLength) {
-						this.sendEvent('debuggerOutput', 'WARNING: Instruction Log Overflow!');
-						this._instructionLog.pop();
-					}
-					this._instructionLog.splice(0, 0, {
-						address: this._instructionPointer,
-						oldData: oldData,
-						didCreateStackFrame: createStackFrame,
-					});
-				}
+				this.updateInstructionLog(createStackFrame);
 				if(nextInstructionPointer !== undefined) {
-					this._instructionPointer = nextInstructionPointer - 1;
+					this._instructionPointer = nextInstructionPointer;
+				} else {
+					this._instructionPointer++;
 				}
 
 				if(step) {
@@ -738,6 +895,28 @@ export class HMMMRuntime extends EventEmitter {
 		}
 	}
 
+	private createStackFrame() {
+		if(!this._stackEnabled) return;
+		if(this._stack.length >= this._maxStackDepth) {
+			this.debuggerOutput('WARNING: Stack Overflow!');
+			this._stack.pop();
+		}
+		this._stack.splice(0, 0, this.getCurrentState());
+	}
+
+	private updateInstructionLog(didCreateStackFrame: boolean) {
+		if(!this._instructionLogEnabled) return;
+		if(this._instructionLog.length >= this._maxInstructionLogLength) {
+			this.debuggerOutput('WARNING: Instruction Log Overflow!');
+			this._instructionLog.pop();
+		}
+		this._instructionLog.splice(0, 0, {
+			id: this._instructionId++,
+			address: this._instructionPointer,
+			didCreateStackFrame: didCreateStackFrame && this._stackEnabled,
+		});
+	}
+
 	private verifyBreakpoints(path: string) : void {
 		if(this._sourceFile && this._sourceFile !== path) return; // We've finalized the source file, so don't bother with breakpoints in other files
 
@@ -747,6 +926,33 @@ export class HMMMRuntime extends EventEmitter {
 
 			bps.filter(bp => !bp.verified && validLocations.indexOf(bp.line!) !== -1).forEach(bp => bp.verified = true);
 		}
+	}
+
+	private onInvalidInstruction() {
+		const message = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
+		this.onException("invalid-instruction", message, true);
+	}
+
+	private onException(exception: string, description: string, isCritical: boolean): boolean {
+		if(this._enabledExceptions.has(exception)) {
+			this._exception = exception;
+			this._exceptionDescription = description;
+			this.sendEvent('stopOnBreakpoint', 'exception', this._enabledExceptions.get(exception)!);
+			return true;
+		}
+		if(!isCritical) return false;
+		this.instructionOutput('stderr', description);
+		this.sendEvent('end');
+		return true;
+	}
+
+	private instructionOutput(category: "stdout" | "stderr", message: string) {
+		const line = this._instructionToSourceMap.get(this._instructionPointer);
+		this.sendEvent('output', category, message, line ? this.source : undefined, line);
+	}
+
+	private debuggerOutput(message: string) {
+		this.sendEvent('output', 'console', message, undefined, undefined);
 	}
 
 	private sendEvent(event: string, ... args: any[]) {

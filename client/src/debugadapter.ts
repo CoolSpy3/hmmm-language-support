@@ -34,6 +34,11 @@ export function sliceWithCount<T>(array: T[], start?: number, count?: number): T
 	return array.slice(start, (start ?? 0) + (count ?? array.length));
 }
 
+/// https://stackoverflow.com/a/14438954
+export function removeDuplicates<T>(value: T, index: number, array: T[]): boolean {
+	return array.indexOf(value) === index;
+}
+
 export class HMMMDebugSession extends DebugSession {
 
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
@@ -60,6 +65,11 @@ export class HMMMDebugSession extends DebugSession {
 		this._runtime.on('stop', (event: string) => {
 			this.sendEvent(new StoppedEvent(event, HMMMDebugSession.THREAD_ID));
 		});
+		this._runtime.on('stopOnBreakpoint', (event: string, breakpointIds: number | number[]) => {
+			const e: DebugProtocol.StoppedEvent = new StoppedEvent(event, HMMMDebugSession.THREAD_ID);
+			e.body.hitBreakpointIds = Array.isArray(breakpointIds) ? breakpointIds : [ breakpointIds ];
+			this.sendEvent(e);
+		});
 		this._runtime.on('breakpointValidated', (bp: DebugProtocol.Breakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', bp));
 		});
@@ -67,12 +77,11 @@ export class HMMMDebugSession extends DebugSession {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			this.sendEvent(e);
 		});
-		this._runtime.on('output', (text, source, line, column) => {
+		this._runtime.on('output', (text, type, source, line) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
+			e.body.category = type;
 			e.body.source = source;
-			e.body.line = this.convertDebuggerLineToClient(line);
-			e.body.column = this.convertDebuggerColumnToClient(column);
-			e.body.category = 'stdout';
+			e.body.line = line ? this.convertDebuggerLineToClient(line) : undefined;
 			this.sendEvent(e);
 		});
 		this._runtime.on('end', () => {
@@ -123,7 +132,7 @@ export class HMMMDebugSession extends DebugSession {
 				filter: "instruction-read",
 				label: "Instruction Read",
 				default: false,
-				description: "The program attempted to read an instruction from memory."
+				description: "The program attempted to read from an address inside the code segment."
 			},
 			{
 				filter: "instruction-write",
@@ -198,7 +207,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
+	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments): void {
 		if(!args.source.path) {
 			this.sendResponse(response);
 			return;
@@ -250,7 +259,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
+	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments) {
 		response.body.variables = [];
 
 		const parsedName = this.parseVariableName(this._variableHandles.get(args.variablesReference));
@@ -311,7 +320,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments, request?: DebugProtocol.Request | undefined): void {
+	protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments): void {
 		const parsedName = this.parseVariableName(args.expression);
 		if(!parsedName) {
 			this.sendResponse(response);
@@ -336,7 +345,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments, request?: DebugProtocol.Request | undefined): void {
+	protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments): void {
 		const parsedName = this.parseVariableName(args.name);
 		if(!parsedName) {
 			this.sendResponse(response);
@@ -361,22 +370,40 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected dataBreakpointInfoRequest(response: DebugProtocol.DataBreakpointInfoResponse, args: DebugProtocol.DataBreakpointInfoArguments): void {
-
 		response.body = {
-            dataId: null,
-            description: "cannot break on data access",
-            accessTypes: undefined,
-            canPersist: false
-        };
+			dataId: null,
+			description: "Data breakpoints can only be set on memory addresses and general purpose registers."
+		};
 
-		if (args.variablesReference && args.name) {
-			const id = this._variableHandles.get(args.variablesReference);
-			if (id.startsWith("global_")) {
-				response.body.dataId = args.name;
-				response.body.description = args.name;
-				response.body.accessTypes = [ "read" ];
-				response.body.canPersist = true;
+		if(args.variablesReference) {
+			const container = this._variableHandles.get(args.variablesReference);
+			const [ frame, name, format ] = this.parseVariableName(container) ?? [ undefined, undefined, undefined ];
+
+			if(name && name !== "memory" && name !== "registers") {
+				this.sendResponse(response);
+				return;
 			}
+		}
+
+		const parsedName = this.parseVariableName(args.name);
+		if(!parsedName) {
+			this.sendResponse(response);
+			return;
+		}
+		const [ frame, name, format ] = parsedName;
+
+		if(format) {
+			this.sendResponse(response);
+			return;
+		}
+
+		if (/$(r\d+|addr_\d+)/.test(name) && name !== "r0") {
+			response.body = {
+				dataId: name,
+				description: name.startsWith("addr_") ? `Memory Address ${name.substring("addr_".length)}` : `Register ${name.substring(1)}`,
+				accessTypes: [ "read", "write", "readWrite" ],
+				canPersist: true
+			};
 		}
 
 		this.sendResponse(response);
@@ -387,17 +414,44 @@ export class HMMMDebugSession extends DebugSession {
 		// clear all data breakpoints
 		this._runtime.clearAllDataBreakpoints();
 
-		response.body = {
-			breakpoints: []
-		};
+		response.body.breakpoints = args.breakpoints.map(bp => {
+			if(/$(r\d+|addr_\d+)/.test(bp.dataId) && bp.dataId !== "r0") {
+				const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
+				const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
 
-		for (let dbp of args.breakpoints) {
-			// assume that id is the "address" to break on
-			const ok = this._runtime.setDataBreakpoint(dbp.dataId);
-			response.body.breakpoints.push({
-				verified: ok
-			});
-		}
+				if(bp.dataId.startsWith("addr_")) {
+					const address = parseInt(bp.dataId.substring("addr_".length));
+					if(isNaN(address) || address < 0 || address > 255) {
+						return <DebugProtocol.Breakpoint> {
+							verified: false,
+							message: `${address} is not a valid memory address.`
+						};
+					}
+					return <DebugProtocol.Breakpoint> {
+						id: this._runtime.setDataBreakpoint(address, "memory", onRead, onWrite),
+						verified: true,
+						description: `Memory Address ${address}`
+					}
+				} else {
+					const register = parseInt(bp.dataId.substring(1));
+					if(isNaN(register) || register < 0 || register > 15) {
+						return <DebugProtocol.Breakpoint> {
+							verified: false,
+							message: `${register} is not a valid register.`
+						};
+					}
+					return <DebugProtocol.Breakpoint> {
+						id: this._runtime.setDataBreakpoint(register, "register", onRead, onWrite),
+						verified: true,
+						description: `Register ${register}`
+					}
+				}
+			}
+			return <DebugProtocol.Breakpoint> {
+				verified: false,
+				message: `Data breakpoints can only be set on memory addresses and general purpose registers.`
+			};
+		});
 
 		this.sendResponse(response);
 	}
@@ -609,7 +663,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint["attributes"]): DebugProtocol.VariablePresentationHint["attributes"] {
-		return attributes ? attributes.concat("readOnly").filter((value, index, array) => array.indexOf(value) === index) : [ "readOnly" ]; // https://stackoverflow.com/a/14438954
+		return attributes ? attributes.concat("readOnly").filter(removeDuplicates) : [ "readOnly" ];
 	}
 
 	private static formatValue(value: number, signed?: boolean, hex?: boolean): string {
