@@ -99,6 +99,8 @@ export class HMMMRuntime extends EventEmitter {
 	private _memoryReadBreakpoints = new Map<number, number>();
 	private _memoryWriteBreakpoints = new Map<number, number>();
 
+	private _hitBreakpoints: number[] = [];
+
 	private _enabledExceptions = new Map<string, number>();
 	private _exception: string = "";
 	private _exceptionDescription: string = "";
@@ -516,7 +518,7 @@ export class HMMMRuntime extends EventEmitter {
 		return accesses;
 	}
 
-	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false): boolean {
+	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false, trackHits = true): boolean {
 		if(!accesses) accesses = this.determineAccesses();
 
 		let hitBreakpoints: number[] = [];
@@ -542,10 +544,10 @@ export class HMMMRuntime extends EventEmitter {
 				if(access.address < this._numInstructions) {
 					if(access.accessType === "read" && this._enabledExceptions.has("instruction-read")) {
 						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}!`;
-						if(this.onException("instruction-read", message, false)) return true;
+						if(this.onException("instruction-read", message, false, trackHits)) return true;
 					} else if(access.accessType === "write" && this._enabledExceptions.has("instruction-write")) {
 						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}!`;
-						if(this.onException("instruction-write", message, false)) return true;
+						if(this.onException("instruction-write", message, false, trackHits)) return true;
 					}
 				}
 
@@ -559,7 +561,8 @@ export class HMMMRuntime extends EventEmitter {
 		}
 
 		if(hitBreakpoints.length > 0) {
-			hitBreakpoints = hitBreakpoints.filter(removeDuplicates);
+			hitBreakpoints = hitBreakpoints.filter(removeDuplicates).filter(id => !hitBreakpoints.includes(id));
+			if(trackHits) this._hitBreakpoints = this._hitBreakpoints.concat(hitBreakpoints);
 			this.emit('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
 			return true;
 		}
@@ -644,8 +647,6 @@ export class HMMMRuntime extends EventEmitter {
 				const instructionInfo = this._instructionLog.shift()!;
 				this._instructionPointer = instructionInfo.address;
 
-				this.checkInstructionExecutionAccess();
-
 				const parsedInstruction = this.getCurrentInstruction();
 
 				if(!parsedInstruction) {
@@ -721,7 +722,7 @@ export class HMMMRuntime extends EventEmitter {
 					return;
 				}
 
-				if(this.checkAccesses()) return;
+				if(this.checkAccesses(undefined, undefined, false)) return;
 
 				if(step) {
 					this.sendEvent('stop', 'step');
@@ -739,7 +740,11 @@ export class HMMMRuntime extends EventEmitter {
 		} else {
 			while (this._instructionPointer < 256) {
 				if(this._breakpoints.has(this._instructionPointer)) {
-					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
+					const breakpointId = this._breakpoints.get(this._instructionPointer)!;
+					if(!this._hitBreakpoints.includes(breakpointId)) {
+						this.sendEvent('stopOnBreakpoint', 'breakpoint', breakpointId);
+						this._hitBreakpoints.push(breakpointId);
+					}
 					return;
 				}
 
@@ -747,6 +752,8 @@ export class HMMMRuntime extends EventEmitter {
 					this.sendEvent('stop', 'pause');
 					return;
 				}
+
+				if(this.checkInstructionExecutionAccess()) return;
 
 				const parsedInstruction = this.getCurrentInstruction();
 
@@ -884,6 +891,7 @@ export class HMMMRuntime extends EventEmitter {
 				} else {
 					this._instructionPointer++;
 				}
+				this._hitBreakpoints = [];
 
 				if(step) {
 					this.sendEvent('stop', 'step');
@@ -933,12 +941,17 @@ export class HMMMRuntime extends EventEmitter {
 		this.onException("invalid-instruction", message, true);
 	}
 
-	private onException(exception: string, description: string, isCritical: boolean): boolean {
+	private onException(exception: string, description: string, isCritical: boolean, trackHits = true): boolean {
 		if(this._enabledExceptions.has(exception)) {
-			this._exception = exception;
-			this._exceptionDescription = description;
-			this.sendEvent('stopOnBreakpoint', 'exception', this._enabledExceptions.get(exception)!);
-			return true;
+			const exceptionId = this._enabledExceptions.get(exception)!;
+			if(!this._hitBreakpoints.includes(exceptionId) || isCritical) { // Critical exceptions should never be added to the hit breakpoints list, but just in case...
+				this._exception = exception;
+				this._exceptionDescription = description;
+				this.sendEvent('stopOnBreakpoint', 'exception', this._enabledExceptions.get(exception)!);
+				if(trackHits && !isCritical) this._hitBreakpoints.push(exceptionId);
+				return true;
+			}
+			return false;
 		}
 		if(!isCritical) return false;
 		this.instructionOutput('stderr', description);
