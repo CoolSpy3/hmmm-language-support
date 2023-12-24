@@ -57,29 +57,22 @@ export class HMMMDebugSession extends DebugSession {
 		this._runtime = new HMMMRuntime();
 
 		// setup event handlers
-		this._runtime.on('stopOnEntry', () => {
-			this.sendEvent(new StoppedEvent('entry', HMMMDebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnStep', () => {
-			this.sendEvent(new StoppedEvent('step', HMMMDebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('breakpoint', HMMMDebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnDataBreakpoint', () => {
-			this.sendEvent(new StoppedEvent('data breakpoint', HMMMDebugSession.THREAD_ID));
-		});
-		this._runtime.on('stopOnException', () => {
-			this.sendEvent(new StoppedEvent('exception', HMMMDebugSession.THREAD_ID));
+		this._runtime.on('stop', (event: string) => {
+			this.sendEvent(new StoppedEvent(event, HMMMDebugSession.THREAD_ID));
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugProtocol.Breakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', bp));
 		});
-		this._runtime.on('output', (text, filePath, line, column) => {
+		this._runtime.on('debuggerOutput', (text) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			e.body.source = this.createSource(filePath);
+			this.sendEvent(e);
+		});
+		this._runtime.on('output', (text, source, line, column) => {
+			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
+			e.body.source = source;
 			e.body.line = this.convertDebuggerLineToClient(line);
 			e.body.column = this.convertDebuggerColumnToClient(column);
+			e.body.category = 'stdout';
 			this.sendEvent(e);
 		});
 		this._runtime.on('end', () => {
@@ -200,7 +193,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		// set and send back the breakpoint positions
 		response.body = {
-			breakpoints: clientLines.map(this.convertClientLineToDebugger, this).map(l => this._runtime.setBreakPoint(path, l))
+			breakpoints: clientLines.map(l => this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l)))
 		};
 		this.sendResponse(response);
 	}
@@ -215,7 +208,7 @@ export class HMMMDebugSession extends DebugSession {
 			this._runtime.getValidInstructionLocations(
 				this.convertClientPathToDebugger(args.source.path),
 				this.convertClientLineToDebugger(args.line),
-				this.convertClientLineToDebugger(args.endLine ?? args.line)
+				args.endLine ? this.convertClientLineToDebugger(args.endLine) : undefined
 			).map(l => <DebugProtocol.BreakpointLocation>{line: this.convertDebuggerLineToClient(l)});
 
 		this.sendResponse(response);
@@ -409,24 +402,52 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected gotoRequest(response: DebugProtocol.GotoResponse, args: DebugProtocol.GotoArguments, request?: DebugProtocol.Request | undefined): void {
+	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request | undefined): void {
+		if(args.column /* args.column is defined and non-zero */ || !args.source.path) {
+			this.sendResponse(response);
+			return;
+		}
 
+		response.body = {
+			targets: this._runtime.getValidInstructionLocations(
+				this.convertClientPathToDebugger(args.source.path),
+				this.convertClientLineToDebugger(args.line)
+			).map(l => {
+				const instructionAddress = this._runtime.getInstructionForSourceLine(l);
+				return <DebugProtocol.GotoTarget> {
+					id: instructionAddress,
+					line: this.convertDebuggerLineToClient(l),
+					label: `Instruction ${instructionAddress}`
+				}
+			})
+		}
+
+		this.sendResponse(response);
 	}
 
-	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request | undefined): void {
+	protected gotoRequest(response: DebugProtocol.GotoResponse, args: DebugProtocol.GotoArguments, request?: DebugProtocol.Request | undefined): void {
+		this._runtime.goto(args.targetId);
 
+		this.sendResponse(response);
 	}
 
 	protected restartFrameRequest(response: DebugProtocol.RestartFrameResponse, args: DebugProtocol.RestartFrameArguments, request?: DebugProtocol.Request | undefined): void {
-
+		this._runtime.restartFrame(args.frameId);
 	}
 
 	protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request | undefined): void {
+		const [ exceptionId, description ] = this._runtime.getLastException();
 
+		response.body = {
+			exceptionId,
+			description,
+			breakMode: "always"
+		};
+		this.sendResponse(response);
 	}
 
 	protected setExceptionBreakPointsRequest(response: DebugProtocol.SetExceptionBreakpointsResponse, args: DebugProtocol.SetExceptionBreakpointsArguments, request?: DebugProtocol.Request | undefined): void {
-
+		this._runtime.setExceptionBreakpoints(args.filters);
 	}
 
 	//---- helpers
@@ -450,7 +471,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	private getVariable(name: string, stackFrame?: number, hex?: boolean, format?: string): DebugProtocol.Variable | undefined {
-		stackFrame = stackFrame ?? 0;
+		stackFrame = stackFrame ?? -1;
 		name = name.toLowerCase();
 
 		if(!isNaN(parseInt(name))) name = `addr_${name}`;
@@ -517,7 +538,7 @@ export class HMMMDebugSession extends DebugSession {
 			stringValue = value;
 		}
 
-		if(stackFrame !== 0) attributes = HMMMDebugSession.withReadOnly(attributes);
+		if(stackFrame !== -1) attributes = HMMMDebugSession.withReadOnly(attributes);
 
 		const evaluateName = `frame_${frame}.${name}${format ? `.${format}` : ""}`;
 		return <DebugProtocol.Variable> {
@@ -531,8 +552,8 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	private setVariable(name: string, value: string, stackFrame?: number, format?: string): void {
-		stackFrame = stackFrame ?? 0;
-		if(stackFrame !== 0) return;
+		stackFrame = stackFrame ?? -1;
+		if(stackFrame !== -1) return;
 
 		name = name.toLowerCase();
 		value = value.toLowerCase().replace(/[_\s]/g, "");

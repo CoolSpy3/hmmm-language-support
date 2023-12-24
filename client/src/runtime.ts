@@ -41,6 +41,12 @@ export class HMMMRuntime extends EventEmitter {
 	// Keep track of the mappings between instruction numbers and source lines
 	private _instructionToSourceMap = new Map<number, number>();
 	private _sourceToInstructionMap = new Map<number, number>();
+	public getInstructionForSourceLine(line: number): number | undefined {
+		return this._sourceToInstructionMap.get(line);
+	}
+	public getSourceLineForInstruction(instruction: number): number | undefined {
+		return this._instructionToSourceMap.get(instruction);
+	}
 
 	// the contents (= lines) of the one and only file
 	private _sourceLines: string[] = [];
@@ -82,6 +88,13 @@ export class HMMMRuntime extends EventEmitter {
 
 	private _breakAddresses = new Set<string>();
 
+	private _enabledExceptions = new Map<string, number>();
+	private _exception: string = "";
+	private _exceptionDescription: string = "";
+	public getLastException(): [string, string] {
+		return [this._exception, this._exceptionDescription];
+	}
+
 	private _stack = new Array<HMMMState>();
 	private _stackEnabled = false;
 	private _maxStackDepth: number = 0;
@@ -89,6 +102,14 @@ export class HMMMRuntime extends EventEmitter {
 	private _instructionLog = new Array<ExecutedInstruction>();
 	private _instructionLogEnabled = false;
 	private _maxInstructionLogLength: number = 0;
+
+	private _pause = false;
+	public get paused() {
+		return this._pause;
+	}
+	public pause() {
+		this._pause = true;
+	}
 
 	public setRegister(register: number, value: number) {
 		if(register < 1 /* register 0 is always 0 */ || register > 15) return;
@@ -135,7 +156,7 @@ export class HMMMRuntime extends EventEmitter {
 		if (stopOnEntry) {
 			// we jump to the first non empty line and stop there
 			if(this._numInstructions > 0) {
-				this.sendEvent('stopOnEntry');
+				this.sendEvent('stop', 'entry');
 			} else {
 				// nothing to run
 				this.sendEvent('end');
@@ -156,8 +177,8 @@ export class HMMMRuntime extends EventEmitter {
 	/**
 	 * Step to the next/previous non empty line.
 	 */
-	public step(reverse = false, event = 'stopOnStep') {
-		this.run(reverse, event);
+	public step(reverse = false) {
+		this.run(reverse, true);
 	}
 
 	/**
@@ -167,7 +188,7 @@ export class HMMMRuntime extends EventEmitter {
 		const stack = sliceWithCount(this._stack, startFrame, levels).map((frame, idx) => {
 			const decompiledInstruction = decompileInstruction(frame.instruction);
 			const sf = new StackFrame(
-				idx,
+				(startFrame ?? 0) + idx,
 				decompiledInstruction ?? "Invalid Instruction!",
 				this._instructionToSourceMap.has(frame.instructionPointer) ? this._source : undefined,
 				this._instructionToSourceMap.get(frame.instructionPointer) ?? undefined
@@ -189,8 +210,24 @@ export class HMMMRuntime extends EventEmitter {
 		return { stackFrames: stack, totalFrames: this._stack.length };
 	}
 
+	public restartFrame(frameId: number) {
+		if(frameId === 0) {
+			this.sendEvent('stop', 'restart');
+			return;
+		}
+		const frame = this._stack[frameId-1];
+		if(!frame) return;
+
+		this._instructionPointer = frame.instructionPointer;
+		this._registers = [...frame.registers];
+		this._memory = [...frame.memory];
+		this._modifiedMemory = new Set(frame.modifiedMemory);
+		this._stack = this._stack.slice(0, frameId);
+	}
+
 	public goto(instruction: number) {
-		this._instructionPointer = instruction - 1;
+		this._instructionPointer = instruction;
+		this.sendEvent('stop', 'goto');
 	}
 
 	public getCurrentState(): HMMMState {
@@ -204,8 +241,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public getStateAtFrame(idx: number): HMMMState | undefined {
-		if(idx === 0) return this.getCurrentState();
-		idx--; // The current instruction is always the 0th frame, so we need to offset the index by 1
+		if(idx === -1) return this.getCurrentState();
 		if(idx < 0 || idx >= this._stack.length) return undefined;
 		return this._stack[idx];
 	}
@@ -215,7 +251,7 @@ export class HMMMRuntime extends EventEmitter {
 		return decompileInstruction(this._memory[address]) ?? "Invalid Instruction!";
 	}
 
-	public getValidInstructionLocations(path: string, startLine: number, endLine?: number): number[] {
+	public getValidInstructionLocations(path: string, startLine?: number, endLine?: number): number[] {
 		if(this._sourceFile && this._sourceFile !== path) return []; // We've finalized the source file, so don't bother with breakpoints in other files
 
 		const isBinary = path.endsWith('.hb');
@@ -224,12 +260,12 @@ export class HMMMRuntime extends EventEmitter {
 
 		const lines = readFileSync(path).toString().split('\n');
 
-		startLine = Math.max(startLine, 0);
-		endLine = endLine ? Math.min(endLine + 1, lines.length) : lines.length;
+		startLine = Math.max(startLine ?? 0, 0);
+		endLine = endLine ? Math.min(endLine, lines.length - 1) : startLine;
 
 		const bps: number[] = [];
 
-		for (let line = startLine; line < endLine; line++) {
+		for (let line = startLine; line <= endLine; line++) {
 			const lineText = lines[line];
 
 			if(isBinary) {
@@ -310,6 +346,20 @@ export class HMMMRuntime extends EventEmitter {
 	 */
 	public clearAllDataBreakpoints(): void {
 		this._breakAddresses.clear();
+	}
+
+	public setExceptionBreakpoints(enabledExceptions: Array<string>): DebugProtocol.Breakpoint[] {
+		const breakpoints = enabledExceptions.map((exception) => <DebugProtocol.Breakpoint> {
+			id: this._breakpointId++,
+			verified: true
+		});
+
+		this._enabledExceptions = new Map();
+		breakpoints.forEach((bp, idx) => {
+			this._enabledExceptions.set(enabledExceptions[idx], bp.id!);
+		});
+
+		return breakpoints;
 	}
 
 	/**
@@ -400,7 +450,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * Run through the file.
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
-	private run(reverse = false, stepEvent?: string) {
+	private run(reverse = false, step = false) {
 		if (reverse) {
 			if(!this._instructionLogEnabled) {
 				window.showErrorMessage(`Reverse Execution is not enabled!`);
@@ -415,7 +465,12 @@ export class HMMMRuntime extends EventEmitter {
 				const parsedInstruction = this.getCurrentInstruction();
 
 				if(!parsedInstruction) {
-					window.showErrorMessage(`Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`);
+					if(this._enabledExceptions.has("invalid-instruction")) {
+						this._exception = "invalid-instruction";
+						this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
+						this.sendEvent('stop', 'exception');
+						return;
+					}
 					this.sendEvent('end');
 					return;
 				}
@@ -424,11 +479,10 @@ export class HMMMRuntime extends EventEmitter {
 
 				if(instructionInfo.didCreateStackFrame) {
 					if(this._stack.length === 0) {
-						window.showErrorMessage(`Stack Underflow!`);
-						this.sendEvent('end');
-						return;
+						this.sendEvent('debuggerOutput', 'WARNING: Stack Underflow!');
+					} else {
+						this._stack.shift();
 					}
-					this._stack.shift();
 				}
 
 				const oldData = instructionInfo.oldData;
@@ -484,36 +538,51 @@ export class HMMMRuntime extends EventEmitter {
 						this.sendEvent('end');
 						return;
 				}
-			}
 
-			if(this._breakpoints.has(this._instructionPointer)) {
-				this.sendEvent('stopOnBreakpoint');
-				return;
-			}
+				if(this._breakpoints.has(this._instructionPointer)) {
+					this.sendEvent('stop', 'breakpoint');
+					return;
+				}
 
-			if(stepEvent) {
-				this.sendEvent(stepEvent);
-				return;
+				if(step) {
+					this.sendEvent('stop', 'step');
+					return;
+				}
+
+				if(this._pause) {
+					this.sendEvent('stop', 'pause');
+					return;
+				}
 			}
 
 			// no more instructions
-			this.sendEvent('stopOnEntry');
+			this.sendEvent('stop', 'entry');
 		} else {
 			for (; this._instructionPointer <= 255; this._instructionPointer++) {
 				if(this._breakpoints.has(this._instructionPointer)) {
-					this.sendEvent('stopOnBreakpoint');
+					this.sendEvent('stop', 'breakpoint');
+					return;
+				}
+
+				if(this._pause) {
+					this.sendEvent('stop', 'pause');
 					return;
 				}
 
 				const parsedInstruction = this.getCurrentInstruction();
 
 				if(!parsedInstruction) {
-					window.showErrorMessage(`Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`);
+					if(this._enabledExceptions.has("invalid-instruction")) {
+						this._exception = "invalid-instruction";
+						this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
+						this.sendEvent('stop', 'exception');
+						return;
+					}
 					this.sendEvent('end');
 					return;
 				}
 
-				const [binaryInstruction, instruction, rX, rY, rZ, N] = this.getCurrentInstruction()!;
+				const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
 				let createStackFrame = false;
 				let oldData: number | undefined = undefined;
@@ -524,7 +593,10 @@ export class HMMMRuntime extends EventEmitter {
 						this.sendEvent('end');
 						return;
 					case "read":
+						oldData = this._registers[rX!];
 					case "write":
+						this.sendEvent('output', this._registers[rX!], this.source, this._instructionToSourceMap.get(this._instructionPointer) ?? undefined, 0);
+						return;
 					case "jumpr":
 						nextInstructionPointer = this._registers[rX!];
 						createStackFrame = true;
@@ -624,21 +696,26 @@ export class HMMMRuntime extends EventEmitter {
 						}
 						break;
 					default:
-						window.showErrorMessage(`Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`);
+						if(this._enabledExceptions.has("invalid-instruction")) {
+							this._exception = "invalid-instruction";
+							this._exceptionDescription = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
+							this.sendEvent('stop', 'exception');
+							return;
+						}
 						this.sendEvent('end');
 						return;
 				}
 
 				if(createStackFrame && this._stackEnabled) {
 					if(this._stack.length >= this._maxStackDepth) {
-						window.showErrorMessage(`Stack Overflow!`);
+						this.sendEvent('debuggerOutput', 'WARNING: Stack Overflow!');
 						this._stack.pop();
 					}
 					this._stack.splice(0, 0, this.getCurrentState());
 				}
 				if(this._instructionLogEnabled) {
 					if(this._instructionLog.length >= this._maxInstructionLogLength) {
-						window.showErrorMessage(`Instruction Log Overflow!`);
+						this.sendEvent('debuggerOutput', 'WARNING: Instruction Log Overflow!');
 						this._instructionLog.pop();
 					}
 					this._instructionLog.splice(0, 0, {
@@ -651,13 +728,12 @@ export class HMMMRuntime extends EventEmitter {
 					this._instructionPointer = nextInstructionPointer - 1;
 				}
 
-				if(stepEvent) {
-					this.sendEvent(stepEvent);
+				if(step) {
+					this.sendEvent('stop', 'step');
 					return;
 				}
 			}
-			// no more lines: run to end
-			window.showErrorMessage(`Reached End of Memory!`);
+			// no more lines
 			this.sendEvent('end');
 		}
 	}
@@ -667,7 +743,7 @@ export class HMMMRuntime extends EventEmitter {
 
 		let bps = this._sourceBreakpoints.get(path);
 		if (bps) {
-			const validLocations = this.getValidInstructionLocations(path, 0);
+			const validLocations = this.getValidInstructionLocations(path);
 
 			bps.filter(bp => !bp.verified && validLocations.indexOf(bp.line!) !== -1).forEach(bp => bp.verified = true);
 		}
