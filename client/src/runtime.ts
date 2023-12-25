@@ -4,7 +4,7 @@ import { Source, StackFrame } from '@vscode/debugadapter';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
-import { window, workspace } from 'vscode';
+import { InputBoxOptions, window, workspace } from 'vscode';
 import { HMMMOperandType, ParsedHMMMInstruction, binaryRegex, compile, decompileInstruction, parseBinaryInstruction, preprocessLine } from '../../hmmm-spec/out/hmmm';
 import { removeDuplicates, sliceWithCount } from './debugadapter';
 
@@ -635,7 +635,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * Run through the file.
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
-	private run(reverse = false, step = false) {
+	private async run(reverse = false, step = false) {
 		if (reverse) {
 			if(!this._instructionLogEnabled) {
 				window.showErrorMessage(`Reverse Execution is not enabled!`);
@@ -744,8 +744,8 @@ export class HMMMRuntime extends EventEmitter {
 					if(!this._hitBreakpoints.includes(breakpointId)) {
 						this.sendEvent('stopOnBreakpoint', 'breakpoint', breakpointId);
 						this._hitBreakpoints.push(breakpointId);
+						return;
 					}
-					return;
 				}
 
 				if(this._pause) {
@@ -776,9 +776,19 @@ export class HMMMRuntime extends EventEmitter {
 						return;
 					case "read":
 						oldData = this._registers[rX!];
+						const input = parseInt(await window.showInputBox(<InputBoxOptions> {
+							prompt: `Enter a number to store into r${rX}. Type any text to terminate the program.`,
+							title: `HMMM: ${this._instructionPointer} ${decompileInstruction(instruction)}`
+						}) ?? '');
+						if(isNaN(input)) {
+							this.sendEvent('end');
+							return;
+						}
+						this.setRegister(rX!, input);
+						break;
 					case "write":
 						this.instructionOutput('stdout', String.fromCharCode(this._registers[rX!]));
-						return;
+						break;
 					case "jumpr":
 						nextInstructionPointer = this._registers[rX!];
 						createStackFrame = true;
