@@ -3,6 +3,7 @@
 import {
 	BreakpointEvent,
 	DebugSession,
+	ErrorDestination,
 	Handles,
 	InitializedEvent,
 	OutputEvent,
@@ -24,10 +25,9 @@ import { HMMMRuntime } from './runtime';
  * The interface should always match this schema.
  */
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
-	/** An absolute path to the "program" to debug. */
+	/** An absolute path to the program to debug. */
 	program: string;
-	/** Automatically stop target after launch. If not specified, target does not stop. */
-	stopOnEntry?: boolean;
+	isBinary: boolean;
 }
 
 export function sliceWithCount<T>(array: T[], start?: number, count?: number): T[] {
@@ -44,8 +44,10 @@ export class HMMMDebugSession extends DebugSession {
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
 	private static THREAD_ID = 1;
 
-	private _runtime: HMMMRuntime;
+	private _configurationDone: ((value: void | PromiseLike<void>) => void) | undefined = undefined;
+	private _source: Source | undefined = undefined;
 
+	private _runtime: HMMMRuntime;
 	private _variableHandles = new Handles<string>();
 
 	/**
@@ -77,10 +79,10 @@ export class HMMMDebugSession extends DebugSession {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			this.sendEvent(e);
 		});
-		this._runtime.on('output', (text, type, source, line) => {
+		this._runtime.on('output', (text, type, line) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			e.body.category = type;
-			e.body.source = source;
+			e.body.source = line ? this._source : undefined;
 			e.body.line = line ? this.convertDebuggerLineToClient(line) : undefined;
 			this.sendEvent(e);
 		});
@@ -98,6 +100,8 @@ export class HMMMDebugSession extends DebugSession {
 
 		// build and return the capabilities of this debug adapter:
 		response.body = response.body || {};
+
+		response.body.supportsConfigurationDoneRequest = true;
 
 		// Execution Capabilities
 		response.body.supportsGotoTargetsRequest = true;
@@ -150,18 +154,35 @@ export class HMMMDebugSession extends DebugSession {
 		response.body.supportsExceptionInfoRequest = true;
 
 		this.sendResponse(response);
+	}
 
-		// since this debug adapter can accept configuration requests like 'setBreakpoint' at any time,
-		// we request them early by sending an 'initializeRequest' to the frontend.
-		// The frontend will end the configuration sequence by calling 'configurationDone' request.
-		this.sendEvent(new InitializedEvent());
+	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments): void {
+		this._configurationDone?.();
+
+		this.sendResponse(response);
 	}
 
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
-		// start the program in the runtime
-		this._runtime.start(args.program, this.createSource(args.program), !!args.stopOnEntry);
+		this._source = this.createSource(args.program);
+
+		if(!this._runtime.configure(args.program, args.isBinary ? "hb" : "hmmm")) {
+			this.sendErrorResponse(response, 1, "Program contains errors! Please fix them before debugging.", undefined, ErrorDestination.User);
+			return;
+		}
 
 		this.sendResponse(response);
+
+		const resolveOnConfigurationDone = new Promise<void>(resolve => this._configurationDone = resolve);
+
+		this.sendEvent(new InitializedEvent());
+
+		await Promise.race([
+			resolveOnConfigurationDone,
+			new Promise<void>(resolve => setTimeout(resolve, 5000)) // https://stackoverflow.com/a/51939030
+		]);
+
+		// start the program in the runtime
+		this._runtime.continue();
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
@@ -189,36 +210,41 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
-		if(!args.source.path) {
+		const clientLines = args.lines ?? [];
+
+		if(!this.matchesSource(args.source.path)) {
+			response.body.breakpoints = clientLines.map(l => <DebugProtocol.Breakpoint>{
+				verified: false,
+				source: this._source,
+				line: l
+			});
 			this.sendResponse(response);
 			return;
 		}
 
-		const path = this.convertClientPathToDebugger(args.source.path);
-		const clientLines = args.lines || [];
-
 		// clear all breakpoints for this file
-		this._runtime.clearBreakpoints(path);
+		this._runtime.clearBreakpoints();
 
 		// set and send back the breakpoint positions
-		response.body = {
-			breakpoints: clientLines.map(l => this._runtime.setBreakPoint(path, this.convertClientLineToDebugger(l)))
-		};
+		response.body.breakpoints = clientLines.map(l => {
+			const bp = this._runtime.setBreakpoint(this.convertClientLineToDebugger(l));
+			bp.source = this._source;
+			return bp;
+		});
 		this.sendResponse(response);
 	}
 
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments): void {
-		if(!args.source.path) {
+		if(!this.matchesSource(args.source.path)) {
 			this.sendResponse(response);
 			return;
 		}
 
 		response.body.breakpoints =
 			this._runtime.getValidInstructionLocations(
-				this.convertClientPathToDebugger(args.source.path),
 				this.convertClientLineToDebugger(args.line),
 				args.endLine ? this.convertClientLineToDebugger(args.endLine) : undefined
-			).map(l => <DebugProtocol.BreakpointLocation>{line: this.convertDebuggerLineToClient(l)});
+			).map(l => <DebugProtocol.BreakpointLocation>{ line: this.convertDebuggerLineToClient(l) });
 
 		this.sendResponse(response);
 	}
@@ -234,7 +260,8 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
-		response.body = this._runtime.getStack(args.startFrame, args.levels)
+		response.body = this._runtime.getStack(args.startFrame, args.levels);
+		response.body.stackFrames.forEach(frame => frame.source = this._source);
 		this.sendResponse(response);
 	}
 
@@ -457,14 +484,13 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request | undefined): void {
-		if(args.column /* args.column is defined and non-zero */ || !args.source.path) {
+		if(args.column /* if args.column is defined and non-zero */ || !this.matchesSource(args.source.path)) {
 			this.sendResponse(response);
 			return;
 		}
 
 		response.body = {
 			targets: this._runtime.getValidInstructionLocations(
-				this.convertClientPathToDebugger(args.source.path),
 				this.convertClientLineToDebugger(args.line)
 			).map(l => {
 				const instructionAddress = this._runtime.getInstructionForSourceLine(l);
@@ -660,6 +686,10 @@ export class HMMMDebugSession extends DebugSession {
 
 	private createSource(filePath: string): Source {
 		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, undefined);
+	}
+
+	private matchesSource(path: string | undefined) {
+		return path && path === (this._source?.path ?? undefined);
 	}
 
 	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint["attributes"]): DebugProtocol.VariablePresentationHint["attributes"] {

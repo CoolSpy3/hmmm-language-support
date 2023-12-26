@@ -19,6 +19,14 @@
     "vscode": "^1.85.0"
   },
   "contributes": {
+    "breakpoints": [
+      {
+        "language": "hb"
+      },
+      {
+        "language": "hmmm"
+      }
+    ],
     "configuration": {
       "title": "HMMM Language Support",
       "properties": {
@@ -44,28 +52,81 @@
         }
       }
     },
-    "languages": [{
-      "id": "hmmm",
-      "aliases": ["HMMM", "hmmm"],
-      "extensions": [".hmmm"],
-      "configuration": "./syntaxes/hmmm-language-configuration.json"
-    },
-    {
-      "id": "hb",
-      "aliases": ["HB", "hb", "HMMM Binary"],
-      "extensions": [".hb"],
-      "configuration": "./syntaxes/hb-language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "hmmm",
-      "scopeName": "source.hmmm",
-      "path": "./syntaxes/hmmm.tmLanguage.json"
-    },
-    {
-      "language": "hb",
-      "scopeName": "source.hb",
-      "path": "./syntaxes/hb.tmLanguage.json"
-    }]
+    "debuggers": [
+      {
+        "type": "hmmm",
+        "label": "HMMM Debug",
+        "program": "./client/out/debugadapter.js",
+        "runtime": "node",
+        "languages": [ "hmmm" ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [ "program" ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The program to debug"
+              },
+              "isBinary": {
+                "type": "boolean",
+                "description": "Whether the program is a compiled (HMMM Binary) file"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "hmmm",
+            "request": "launch",
+            "name": "Debug HMMM",
+            "program": "${file}",
+            "isBinary": false
+          },
+          {
+            "type": "hmmm",
+            "request": "launch",
+            "name": "Debug HMMM (Binary)",
+            "program": "${file}",
+            "isBinary": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "type": "hmmm",
+            "request": "launch",
+            "name": "Debug HMMM",
+            "program": "",
+            "isBinary": false
+          }
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "hmmm",
+        "aliases": ["HMMM", "hmmm"],
+        "extensions": [".hmmm"],
+        "configuration": "./syntaxes/hmmm-language-configuration.json"
+      },
+      {
+        "id": "hb",
+        "aliases": ["HB", "hb", "HMMM Binary"],
+        "extensions": [".hb"],
+        "configuration": "./syntaxes/hb-language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hmmm",
+        "scopeName": "source.hmmm",
+        "path": "./syntaxes/hmmm.tmLanguage.json"
+      },
+      {
+        "language": "hb",
+        "scopeName": "source.hb",
+        "path": "./syntaxes/hb.tmLanguage.json"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

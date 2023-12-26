@@ -1,6 +1,6 @@
 // Modified from: https://github.com/microsoft/vscode-mock-debug/blob/668fa6f5db95dbb76825d4eb670ab0d305050c3b/src/mockRuntime.ts
 
-import { Source, StackFrame } from '@vscode/debugadapter';
+import { StackFrame } from '@vscode/debugadapter';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
@@ -35,16 +35,10 @@ interface StateAccess {
  */
 export class HMMMRuntime extends EventEmitter {
 
-	// the initial (and one and only) file we are 'debugging'
-	private _sourceFile: string | undefined = undefined;
-	public get sourceFile() {
-		return this._sourceFile;
-	}
+	private _language: "hb" | "hmmm" | undefined = undefined;
 
-	private _source: Source | undefined;
-	public get source() {
-		return this._source;
-	}
+	// the contents (= lines) of the one and only file
+	private _sourceLines: string[] = [];
 
 	// Keep track of the mappings between instruction numbers and source lines
 	private _instructionToSourceMap = new Map<number, number>();
@@ -55,9 +49,6 @@ export class HMMMRuntime extends EventEmitter {
 	public getSourceLineForInstruction(instruction: number): number | undefined {
 		return this._instructionToSourceMap.get(instruction);
 	}
-
-	// the contents (= lines) of the one and only file
-	private _sourceLines: string[] = [];
 
 	// The address of the current instruction being executed
 	private _instructionPointer = 0;
@@ -85,7 +76,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	// maps from sourceFile to array of breakpoints
-	private _sourceBreakpoints = new Map<string, DebugProtocol.Breakpoint[]>();
+	private _sourceBreakpoints: DebugProtocol.Breakpoint[] = [];
 
 	// maps from instruction number to breakpoint ids
 	private _breakpoints = new Map<number, number>();
@@ -137,48 +128,19 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	/**
-	 * Start executing the given program.
+	 * Configures the runtime to execute the given program
 	 */
-	public start(program: string, source: Source, stopOnEntry: boolean) {
+	public configure(program: string, language: "hb" | "hmmm"): boolean {
+		this._language = language
+
 		const debuggingSettings = workspace.getConfiguration("hmmm.debugging");
 		this._stackEnabled = debuggingSettings.get<boolean>("enableReverseExecution", false);
 		this._maxStackDepth = debuggingSettings.get<number>("reverseExecutionDepth", 0);
 		this._instructionLogEnabled = debuggingSettings.get<boolean>("enableStackFrames", false);
 		this._maxInstructionLogLength = debuggingSettings.get<number>("stackFrameDepth", 0);
 
-		this._source = source;
-		this.loadSource(program);
 		this._instructionPointer = 0;
-
-		this.verifyBreakpoints(this._sourceFile!);
-
-		for(const path of this._sourceBreakpoints.keys()) {
-			if(path !== this._sourceFile) this._sourceBreakpoints.delete(path);
-		}
-
-		for(const bp of this._sourceBreakpoints.get(this._sourceFile!) ?? []) {
-			if(bp.verified) {
-				if(this._sourceToInstructionMap.has(bp.line!)) {
-					this._breakpoints.set(this._sourceToInstructionMap.get(bp.line!)!, bp.id!);
-				} else {
-					bp.verified = false;
-					this.sendEvent('breakpointValidated', bp);
-				}
-			}
-		}
-
-		if (stopOnEntry) {
-			// we jump to the first non empty line and stop there
-			if(this._numInstructions > 0) {
-				this.sendEvent('stop', 'entry');
-			} else {
-				// nothing to run
-				this.sendEvent('end');
-			}
-		} else {
-			// we just start to run until we hit a breakpoint
-			this.continue();
-		}
+		return this.loadSource(program);
 	}
 
 	/**
@@ -196,7 +158,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	/**
-	 * Returns the stacktrace.
+	 * Returns the stacktrace. The returned stack frames do not contain a source file. This is expected to be supplied by the debug adapter.
 	 */
 	public getStack(startFrame: number | undefined, levels: number | undefined): DebugProtocol.StackTraceResponse["body"] {
 		const stack = sliceWithCount(this._stack, startFrame, levels).map((frame, idx) => {
@@ -204,7 +166,7 @@ export class HMMMRuntime extends EventEmitter {
 			const sf = new StackFrame(
 				(startFrame ?? 0) + idx,
 				decompiledInstruction ?? "Invalid Instruction!",
-				this._instructionToSourceMap.has(frame.instructionPointer) ? this._source : undefined,
+				undefined,
 				this._instructionToSourceMap.get(frame.instructionPointer) ?? undefined
 			);
 			if(!decompiledInstruction) sf.presentationHint = "label";
@@ -214,7 +176,7 @@ export class HMMMRuntime extends EventEmitter {
 		const currentInstruction = new StackFrame(
 			-1,
 			this.getInstruction(this._instructionPointer),
-			this._instructionToSourceMap.has(this._instructionPointer) ? this._source : undefined,
+			undefined,
 			this._instructionToSourceMap.get(this._instructionPointer) ?? undefined
 		);
 		currentInstruction.presentationHint = "subtle";
@@ -280,83 +242,51 @@ export class HMMMRuntime extends EventEmitter {
 		return decompileInstruction(this._memory[address]) ?? "Invalid Instruction!";
 	}
 
-	public getValidInstructionLocations(path: string, startLine?: number, endLine?: number): number[] {
-		if(this._sourceFile && this._sourceFile !== path) return []; // We've finalized the source file, so don't bother with breakpoints in other files
-
-		const isBinary = path.endsWith('.hb');
-
-		if(!isBinary && !path.endsWith('.hmmm')) return [];
-
-		const lines = readFileSync(path).toString().split('\n');
-
+	public getValidInstructionLocations(startLine?: number, endLine?: number): number[] {
 		startLine = Math.max(startLine ?? 0, 0);
-		endLine = endLine ? Math.min(endLine, lines.length - 1) : startLine;
+		endLine = endLine ? Math.min(endLine, this._sourceLines.length - 1) : startLine;
 
-		const bps: number[] = [];
+		const validLines: number[] = [];
 
 		for (let line = startLine; line <= endLine; line++) {
-			const lineText = lines[line];
+			const lineText = this._sourceLines[line];
 
-			if(isBinary) {
-				if(binaryRegex.test(lineText)) bps.push(line);
+			if(this._language === "hb") {
+				if(binaryRegex.test(lineText)) validLines.push(line);
 			} else {
-				if(preprocessLine(lineText).trim()) bps.push(line);
+				if(preprocessLine(lineText).trim()) validLines.push(line);
 			}
 		}
 
-		return bps;
+		return validLines;
 	}
 
 	/*
 	 * Set breakpoint in file with given line.
 	 */
-	public setBreakPoint(path: string, line: number) : DebugProtocol.Breakpoint {
+	public setBreakpoint(line: number) : DebugProtocol.Breakpoint {
 		const bp: DebugProtocol.Breakpoint = { verified: false, line, id: this._breakpointId++ };
 
-		if(this._sourceFile && this._sourceFile !== path) { // Only set breakpoints in the finalized source file (if it's been set)
-			let bps = this._sourceBreakpoints.get(path);
-			if (!bps) {
-				bps = new Array<DebugProtocol.Breakpoint>();
-				this._sourceBreakpoints.set(path, bps);
-			}
-			bps.push(bp);
-
-			this.verifyBreakpoints(path);
-
-			if(bp.verified) {
-				this._breakpoints.set(this._sourceToInstructionMap.get(line)!, bp.id!);
-			}
+		if(this._sourceToInstructionMap.has(line)) {
+			bp.verified = true;
+			this._breakpoints.set(this._sourceToInstructionMap.get(line)!, bp.id!);
 		}
 
 		return bp;
 	}
 
-	/*
-	 * Clear breakpoint in file with given line.
+	/**
+	 * Remove the breakpoint on the given line
 	 */
-	public clearBreakpoint(path: string, line: number) : DebugProtocol.Breakpoint | undefined {
-		if(this._sourceFile && this._sourceFile !== path) return; // We've finalized the source file, so don't bother with breakpoints in other files
-
-		let bps = this._sourceBreakpoints.get(path);
-		if (bps) {
-			const index = bps.findIndex(bp => bp.line === line);
-			if (index >= 0) {
-				if(this._sourceFile) {
-					this._breakpoints.delete(this._sourceToInstructionMap.get(line)!);
-				}
-				return bps.splice(index, 1)[0];
-			}
-		}
-		return undefined;
+	public clearBreakpoint(line: number): void {
+		if(this._sourceToInstructionMap.has(line)) this._breakpoints.delete(this._sourceToInstructionMap.get(line)!);
 	}
 
 	/*
-	 * Clear all breakpoints for file.
+	 * Clear all breakpoints
 	 */
-	public clearBreakpoints(path: string): void {
-		if(this._sourceFile && this._sourceFile !== path) return; // We've finalized the source file, so don't bother with breakpoints in other files
-
-		this._sourceBreakpoints.delete(path);
+	public clearBreakpoints(): void {
+		this._breakpoints.clear();
 	}
 
 	/*
@@ -584,22 +514,14 @@ export class HMMMRuntime extends EventEmitter {
 		return false;
 	}
 
-	private loadSource(file: string) {
-		this._sourceFile = file;
-		this._sourceLines = readFileSync(this._sourceFile).toString().split('\n');
-
-		const isBinary = file.endsWith('.hb');
+	private loadSource(file: string): boolean {
+		this._sourceLines = readFileSync(file).toString().split('\n');
 
 		let code = this._sourceLines;
-		if(!isBinary) {
-			if(!file.endsWith('.hmmm')) return;
-
+		if(this._language === "hmmm") {
 			const compiledCode = compile(code);
 
-			if(!compiledCode) {
-				window.showErrorMessage("HMMM File Contains Invalid Code! Please fix any errors/warnings and try again.");
-				return;
-			}
+			if(!compiledCode) return false;
 
 			[code, this._instructionToSourceMap] = compiledCode;
 
@@ -613,7 +535,7 @@ export class HMMMRuntime extends EventEmitter {
 
 			if(!line.trim()) continue; // Skip empty lines
 
-			if(isBinary) {
+			if(this._language === "hb") {
 				this._instructionToSourceMap.set(this._numInstructions, i);
 				this._sourceToInstructionMap.set(i, this._numInstructions);
 			}
@@ -622,13 +544,12 @@ export class HMMMRuntime extends EventEmitter {
 
 			const encodedInstruction = parseInt(line.replaceAll(/\s/g, ''), 2);
 
-			if(isNaN(encodedInstruction)) {
-				window.showErrorMessage(`HMMM File Contains Invalid Code! HMMM Binary files can only contain 0s 1s and whitespace.`);
-				return;
-			}
+			if(isNaN(encodedInstruction)) return false;
 
 			this._memory[i] = encodedInstruction;
 		}
+
+		return true;
 	}
 
 	/**
@@ -935,17 +856,6 @@ export class HMMMRuntime extends EventEmitter {
 		});
 	}
 
-	private verifyBreakpoints(path: string) : void {
-		if(this._sourceFile && this._sourceFile !== path) return; // We've finalized the source file, so don't bother with breakpoints in other files
-
-		let bps = this._sourceBreakpoints.get(path);
-		if (bps) {
-			const validLocations = this.getValidInstructionLocations(path);
-
-			bps.filter(bp => !bp.verified && validLocations.indexOf(bp.line!) !== -1).forEach(bp => bp.verified = true);
-		}
-	}
-
 	private onInvalidInstruction() {
 		const message = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
 		this.onException("invalid-instruction", message, true);
@@ -971,11 +881,11 @@ export class HMMMRuntime extends EventEmitter {
 
 	private instructionOutput(category: "stdout" | "stderr", message: string) {
 		const line = this._instructionToSourceMap.get(this._instructionPointer);
-		this.sendEvent('output', category, message, line ? this.source : undefined, line);
+		this.sendEvent('output', category, message, line);
 	}
 
 	private debuggerOutput(message: string) {
-		this.sendEvent('output', 'console', message, undefined, undefined);
+		this.sendEvent('output', 'console', message, undefined);
 	}
 
 	private sendEvent(event: string, ... args: any[]) {
