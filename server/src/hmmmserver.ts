@@ -448,6 +448,9 @@ connection.onCompletion(
         if (isInIndexRange(position, InstructionPart.LINE_NUM, indices)) {
             // The cursor is in the line number, so suggest the next line number
             populateLineNumber(completionList, params.position.line, document);
+
+            if(isNaN(parseInt(m[InstructionPart.LINE_NUM]))) populateInstructions(completionList); // The line number is invalid, so suggest an instruction
+
             return completionList;
         }
 

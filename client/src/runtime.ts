@@ -147,40 +147,49 @@ export class HMMMRuntime extends EventEmitter {
 	 * Continue execution to the end/beginning.
 	 */
 	public continue(reverse = false) {
-		this.run(reverse, undefined);
+		this.run(reverse);
 	}
 
 	/**
 	 * Step to the next/previous non empty line.
 	 */
-	public step(reverse = false) {
-		this.run(reverse, true);
+	public step(reverse = false, stepInstruction: string = '') {
+		this.run(reverse, stepInstruction);
 	}
 
 	/**
 	 * Returns the stacktrace. The returned stack frames do not contain a source file. This is expected to be supplied by the debug adapter.
 	 */
 	public getStack(startFrame: number | undefined, levels: number | undefined): DebugProtocol.StackTraceResponse["body"] {
-		const stack = sliceWithCount(this._stack, startFrame, levels).map((frame, idx) => {
+		startFrame = startFrame ?? 0;
+		levels = levels ?? this._stack.length + 1;
+
+		const sliceStart = Math.max(startFrame - 1, 0);
+
+		const stack = sliceWithCount(this._stack, sliceStart, startFrame === 0 ? levels - 1 : levels).map((frame, idx) => {
 			const decompiledInstruction = decompileInstruction(frame.instruction);
 			return <StackFrame> {
-				id: (startFrame ?? 0) + idx,
-				name: decompiledInstruction ?? "Invalid Instruction!",
+				id: sliceStart + idx,
+				name: decompiledInstruction ? `${frame.instructionPointer} ${decompiledInstruction}` : "Invalid Instruction",
 				line: this._instructionToSourceMap.get(frame.instructionPointer) ?? -1,
+				column: 0,
 				presentationHint: decompiledInstruction ? "normal" : "label",
+				canRestart: true
 			};
 		});
 
-		const currentInstruction = new StackFrame(
-			-1,
-			this.getInstruction(this._instructionPointer),
-			undefined,
-			this._instructionToSourceMap.get(this._instructionPointer) ?? -1
-		);
-		currentInstruction.presentationHint = "subtle";
+		if(startFrame === 0) {
+			const currentInstruction = <StackFrame> {
+				id: -1,
+				name: this.getInstruction(this._instructionPointer),
+				line: this._instructionToSourceMap.get(this._instructionPointer) ?? -1,
+				column: 0,
+				presentationHint: "subtle",
+				canRestart: false
+			};
 
-		stack.pop();
-		stack.splice(0, 0, currentInstruction);
+			stack.splice(0, 0, currentInstruction);
+		}
 
 		return { stackFrames: stack, totalFrames: this._stack.length + 1 };
 	}
@@ -237,8 +246,9 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public getInstruction(address: number): string {
-		if(address < 0 || address > 255) return "Invalid Instruction Pointer!";
-		return decompileInstruction(this._memory[address]) ?? "Invalid Instruction!";
+		if(address < 0 || address > 255) return "Invalid Instruction Pointer";
+		const instruction = decompileInstruction(this._memory[address]);
+		return instruction ? `${address} ${instruction}` : "Invalid Instruction";
 	}
 
 	public getValidInstructionLocations(startLine?: number, endLine?: number): number[] {
@@ -464,7 +474,7 @@ export class HMMMRuntime extends EventEmitter {
 				}
 			} else {
 				if(access.address < 0 || access.address > 255) {
-					const message = `Instruction at ${this._instructionPointer} attempted to access invalid memory address ${access.address}!`;
+					const message = `Instruction at ${this._instructionPointer} attempted to access invalid memory address ${access.address}`;
 					this.onException("invalid-memory-access", message, true);
 					return true;
 				}
@@ -473,10 +483,10 @@ export class HMMMRuntime extends EventEmitter {
 
 				if(access.address < this._numInstructions) {
 					if(access.accessType === "read" && this._enabledExceptions.has("instruction-read")) {
-						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}!`;
+						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}`;
 						if(this.onException("instruction-read", message, false, trackHits)) return true;
 					} else if(access.accessType === "write" && this._enabledExceptions.has("instruction-write")) {
-						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}!`;
+						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}`;
 						if(this.onException("instruction-write", message, false, trackHits)) return true;
 					}
 				}
@@ -502,7 +512,7 @@ export class HMMMRuntime extends EventEmitter {
 
 	private checkInstructionExecutionAccess(): boolean {
 		if(this._instructionPointer < 0 || this._instructionPointer >= this._numInstructions) {
-			if(this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment!`, false)) {
+			if(this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment`, false)) {
 				return true;
 			}
 		}
@@ -556,10 +566,10 @@ export class HMMMRuntime extends EventEmitter {
 	 * Run through the file.
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
-	private async run(reverse = false, step = false) {
+	private async run(reverse = false, stepInstruction?: string) {
 		if (reverse) {
 			if(!this._instructionLogEnabled) {
-				window.showErrorMessage(`Reverse Execution is not enabled!`);
+				window.showErrorMessage(`Reverse Execution is not enabled`);
 				this.sendEvent('end');
 				return;
 			}
@@ -579,64 +589,66 @@ export class HMMMRuntime extends EventEmitter {
 
 				if(instructionInfo.didCreateStackFrame) {
 					if(this._stack.length === 0) {
-						this.debuggerOutput('WARNING: Stack Underflow!');
+						this.debuggerOutput('WARNING: Stack Underflow');
 					} else {
 						this._stack.shift();
 					}
 				}
 
 				const oldData = instructionInfo.oldData;
-				switch(instruction.instruction.name) {
-					case "halt":
-						this.sendEvent('end');
-						return;
-					case "write":
-					case "jumpr":
-					case "nop":
-					case "jumpn":
-					case "jeqzn":
-					case "jnezn":
-					case "jgtzn":
-					case "jltzn":
-						// These instructions don't change registers or memory, so we don't need to restore anything
-						break;
-					case "read":
-					case "setn":
-					case "loadn":
-					case "loadr":
-					case "copy":
-					case "addn":
-					case "add":
-					case "neg":
-					case "sub":
-					case "mul":
-					case "div":
-					case "mod":
-					case "calln":
-						// Restore rX
-						this.setRegister(rX!, oldData!);
-						break;
-					case "storen":
-						// Restore memory[N]
-						this.setMemory(N!, oldData!);
-						break;
-					case "storer":
-						// Restore memory[rY]
-						this.setMemory(this._registers[rY!], oldData!);
-						break;
-					case "popr":
-						// Restore rX and increment rY
-						this.setRegister(rX!, oldData!);
-						this.setRegister(rY!, this._registers[rY!] + 1);
-						break;
-					case "pushr":
-						// Decrement rY and restore memory[rY]
-						this.setRegister(rY!, this._registers[rY!] - 1);
-						this.setMemory(this._registers[rY!], oldData!);
-						break;
-					default:
-						this.onInvalidInstruction();
-						return;
+				if(oldData !== undefined) {
+					switch(instruction.instruction.name) {
+						case "halt":
+							this.sendEvent('end');
+							return;
+						case "write":
+						case "jumpr":
+						case "nop":
+						case "jumpn":
+						case "jeqzn":
+						case "jnezn":
+						case "jgtzn":
+						case "jltzn":
+							// These instructions don't change registers or memory, so we don't need to restore anything
+							break;
+						case "read":
+						case "setn":
+						case "loadn":
+						case "loadr":
+						case "copy":
+						case "addn":
+						case "add":
+						case "neg":
+						case "sub":
+						case "mul":
+						case "div":
+						case "mod":
+						case "calln":
+							// Restore rX
+							this.setRegister(rX!, oldData!);
+							break;
+						case "storen":
+							// Restore memory[N]
+							this.setMemory(N!, oldData!);
+							break;
+						case "storer":
+							// Restore memory[rY]
+							this.setMemory(this._registers[rY!], oldData!);
+							break;
+						case "popr":
+							// Restore rX and increment rY
+							this.setRegister(rX!, oldData!);
+							this.setRegister(rY!, this._registers[rY!] + 1);
+							break;
+						case "pushr":
+							// Decrement rY and restore memory[rY]
+							this.setRegister(rY!, this._registers[rY!] - 1);
+							this.setMemory(this._registers[rY!], oldData!);
+							break;
+						default:
+							this.onInvalidInstruction();
+							return;
+					}
 				}
 
 				if(this._breakpoints.has(this._instructionPointer)) {
@@ -646,7 +658,7 @@ export class HMMMRuntime extends EventEmitter {
 
 				if(this.checkAccesses(undefined, undefined, false)) return;
 
-				if(step) {
+				if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
 					this.sendEvent('stop', 'step');
 					return;
 				}
@@ -699,7 +711,8 @@ export class HMMMRuntime extends EventEmitter {
 					case "read":
 						oldData = this._registers[rX!];
 						const input = parseInt(await window.showInputBox(<InputBoxOptions> {
-							prompt: `Enter a number to store into r${rX}. Type any text to terminate the program.`,
+							placeHolder: `Enter a number to store into r${rX}`,
+							prompt: `You can also type any non-numerical text to terminate the program.`,
 							title: `HMMM: ${this._instructionPointer} ${decompileInstruction(instruction)}`
 						}) ?? '');
 						if(isNaN(input)) {
@@ -821,7 +834,7 @@ export class HMMMRuntime extends EventEmitter {
 				if(createStackFrame) {
 					this.createStackFrame();
 				}
-				this.updateInstructionLog(createStackFrame);
+				this.updateInstructionLog(createStackFrame, oldData);
 				if(nextInstructionPointer !== undefined) {
 					this._instructionPointer = nextInstructionPointer;
 				} else {
@@ -829,7 +842,7 @@ export class HMMMRuntime extends EventEmitter {
 				}
 				this._hitBreakpoints = [];
 
-				if(step) {
+				if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
 					this.sendEvent('stop', 'step');
 					return;
 				}
@@ -842,27 +855,28 @@ export class HMMMRuntime extends EventEmitter {
 	private createStackFrame() {
 		if(!this._stackEnabled) return;
 		if(this._stack.length >= this._maxStackDepth) {
-			this.debuggerOutput('WARNING: Stack Overflow!');
+			this.debuggerOutput('WARNING: Stack Overflow');
 			this._stack.pop();
 		}
 		this._stack.splice(0, 0, this.getCurrentState());
 	}
 
-	private updateInstructionLog(didCreateStackFrame: boolean) {
+	private updateInstructionLog(didCreateStackFrame: boolean, oldData?: number) {
 		if(!this._instructionLogEnabled) return;
 		if(this._instructionLog.length >= this._maxInstructionLogLength) {
-			this.debuggerOutput('WARNING: Instruction Log Overflow!');
+			this.debuggerOutput('WARNING: Instruction Log Overflow');
 			this._instructionLog.pop();
 		}
 		this._instructionLog.splice(0, 0, {
 			id: this._instructionId++,
 			address: this._instructionPointer,
 			didCreateStackFrame: didCreateStackFrame && this._stackEnabled,
+			oldData: oldData
 		});
 	}
 
 	private onInvalidInstruction() {
-		const message = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}!`;
+		const message = `Invalid Instruction at Address ${this._instructionPointer}: 0x${this._memory[this._instructionPointer].toString(16).padStart(4, '0')}`;
 		this.onException("invalid-instruction", message, true);
 	}
 

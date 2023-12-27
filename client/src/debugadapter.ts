@@ -6,6 +6,7 @@ import {
 	ErrorDestination,
 	Handles,
 	InitializedEvent,
+	InvalidatedEvent,
 	OutputEvent,
 	Source,
 	StoppedEvent,
@@ -126,31 +127,31 @@ export class HMMMDebugSession extends DebugSession {
 				filter: "invalid-instruction",
 				label: "Invalid Instruction",
 				default: true,
-				description: "The program reached attempted to execute a memory address that does not contain a valid instruction."
+				description: "Breaks if the program attempts to execute a memory address that does not contain a valid instruction."
 			},
 			{
 				filter: "invalid-memory-access",
 				label: "Invalid Memory Access",
 				default: true,
-				description: "The program attempted to access a memory address that does not exist."
+				description: "Breaks if the program attempts to access a memory address that does not exist."
 			},
 			{
 				filter: "instruction-read",
 				label: "Instruction Read",
 				default: false,
-				description: "The program attempted to read from an address inside the code segment."
+				description: "Breaks if the program attempts to read from an address inside the code segment."
 			},
 			{
 				filter: "instruction-write",
 				label: "Instruction Write",
 				default: true,
-				description: "The program attempted to overwrite an instruction in memory."
+				description: "Breaks if the program attempts to overwrite an instruction in memory."
 			},
 			{
 				filter: "execute-outside-cs",
 				label: "Execute Outside Code Segment",
 				default: true,
-				description: "The program attempted to execute an instruction outside of the code segment."
+				description: "Breaks if the program attempts to execute an instruction outside of the code segment."
 			}
 		];
 		response.body.supportsExceptionInfoRequest = true;
@@ -165,9 +166,11 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
-		this._source = this.createSource(args.program);
+		const program = this.convertClientPathToDebugger(args.program);
 
-		if(!this._runtime.configure(args.program, args.isBinary ? "hb" : "hmmm")) {
+		this._source = this.createSource(program);
+
+		if(!this._runtime.configure(program, args.isBinary ? "hb" : "hmmm")) {
 			this.sendErrorResponse(response, 1, "Program contains errors! Please fix them before debugging.", undefined, ErrorDestination.User);
 			return;
 		}
@@ -208,6 +211,18 @@ export class HMMMDebugSession extends DebugSession {
 	protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments): void {
 		this._variableHandles.reset();
 		this._runtime.step(true);
+		this.sendResponse(response);
+	}
+
+	protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): void {
+		this._variableHandles.reset();
+		this._runtime.step(false, 'calln');
+		this.sendResponse(response);
+	}
+
+	protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): void {
+		this._variableHandles.reset();
+		this._runtime.step(false, 'jumpr');
 		this.sendResponse(response);
 	}
 
@@ -372,7 +387,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments): void {
-		const parsedName = this.parseVariableName(args.name);
+		const parsedName = this.parseVariableName(args.name, args.variablesReference);
 		if(!parsedName) {
 			this.sendResponse(response);
 			return;
@@ -485,7 +500,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request | undefined): void {
-		if(args.column /* if args.column is defined and non-zero */ || !this.matchesSource(args.source.path)) {
+		if(!this.matchesSource(args.source.path)) {
 			this.sendResponse(response);
 			return;
 		}
@@ -498,6 +513,7 @@ export class HMMMDebugSession extends DebugSession {
 				return <DebugProtocol.GotoTarget> {
 					id: instructionAddress,
 					line: this.convertDebuggerLineToClient(l),
+					column: this.convertDebuggerColumnToClient(0),
 					label: `Instruction ${instructionAddress}`
 				}
 			})
@@ -533,7 +549,15 @@ export class HMMMDebugSession extends DebugSession {
 
 	//---- helpers
 
-	private parseVariableName(name: string): [number | undefined, string, string | undefined] | undefined {
+	private parseVariableName(name: string, variablesReference?: number): [number | undefined, string, string | undefined] | undefined {
+		if(variablesReference && name.endsWith(" Value")) {
+			const container = this.parseVariableName(this._variableHandles.get(variablesReference, ''));
+			if(container) {
+				container[2] = name.substring(0, name.length - " Value".length).toLowerCase();
+				return container;
+			}
+		}
+
 		let frame: number | undefined = undefined;
 		if(name.startsWith("frame_")) {
 			const indexOfDot = name.indexOf('.');
@@ -614,7 +638,7 @@ export class HMMMDebugSession extends DebugSession {
 				displayName = "Modified";
 				const address = name.startsWith("addr_") ? parseInt(name.substring("addr_".length)) : NaN;
 				stringValue = isNaN(address) ? "unknown" : frame.modifiedMemory.has(parseInt(name.substring("addr_".length))).toString();
-				attributes = [ "readOnly" ];
+				attributes = HMMMDebugSession.withReadOnly(attributes);
 				numChildren = 0;
 			} else {
 				stringValue = name === "pc" ? value.toString() : HMMMDebugSession.formatValue(value, true, hex);
@@ -656,7 +680,7 @@ export class HMMMDebugSession extends DebugSession {
 		} else if(value.startsWith("0b")) {
 			newValue = parseInt(value.substring(2), 2);
 			detectedFormat = "binary";
-		} else if(value.length > 6 && /^[01]$/.test(value)) {
+		} else if(value.length > 6 && /^[01]+$/.test(value)) {
 			newValue = parseInt(value, 2);
 			detectedFormat = "binary";
 		} else if(value.startsWith("-")) {
@@ -687,10 +711,12 @@ export class HMMMDebugSession extends DebugSession {
 			if(isNaN(address) || address < 0 || address > 255) return;
 			this._runtime.setMemory(address, newValue);
 		}
+
+		this.sendEvent(new InvalidatedEvent([ "variables" ], HMMMDebugSession.THREAD_ID, stackFrame));
 	}
 
 	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, undefined);
+		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath));
 	}
 
 	private matchesSource(otherPath: string | undefined) {
