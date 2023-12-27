@@ -163,27 +163,26 @@ export class HMMMRuntime extends EventEmitter {
 	public getStack(startFrame: number | undefined, levels: number | undefined): DebugProtocol.StackTraceResponse["body"] {
 		const stack = sliceWithCount(this._stack, startFrame, levels).map((frame, idx) => {
 			const decompiledInstruction = decompileInstruction(frame.instruction);
-			const sf = new StackFrame(
-				(startFrame ?? 0) + idx,
-				decompiledInstruction ?? "Invalid Instruction!",
-				undefined,
-				this._instructionToSourceMap.get(frame.instructionPointer) ?? undefined
-			);
-			if(!decompiledInstruction) sf.presentationHint = "label";
-			return sf;
+			return <StackFrame> {
+				id: (startFrame ?? 0) + idx,
+				name: decompiledInstruction ?? "Invalid Instruction!",
+				line: this._instructionToSourceMap.get(frame.instructionPointer) ?? -1,
+				presentationHint: decompiledInstruction ? "normal" : "label",
+			};
 		});
 
 		const currentInstruction = new StackFrame(
 			-1,
 			this.getInstruction(this._instructionPointer),
 			undefined,
-			this._instructionToSourceMap.get(this._instructionPointer) ?? undefined
+			this._instructionToSourceMap.get(this._instructionPointer) ?? -1
 		);
 		currentInstruction.presentationHint = "subtle";
 
-		stack.push(currentInstruction);
+		stack.pop();
+		stack.splice(0, 0, currentInstruction);
 
-		return { stackFrames: stack, totalFrames: this._stack.length };
+		return { stackFrames: stack, totalFrames: this._stack.length + 1 };
 	}
 
 	public restartFrame(frameId: number) {
@@ -265,7 +264,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * Set breakpoint in file with given line.
 	 */
 	public setBreakpoint(line: number) : DebugProtocol.Breakpoint {
-		const bp: DebugProtocol.Breakpoint = { verified: false, line, id: this._breakpointId++ };
+		const bp: DebugProtocol.Breakpoint = { id: this._breakpointId++, verified: false };
 
 		if(this._sourceToInstructionMap.has(line)) {
 			bp.verified = true;
@@ -418,6 +417,7 @@ export class HMMMRuntime extends EventEmitter {
 				accesses.push({ address: rZ!, dataType: "register", accessType: "read" });
 				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
 				break;
+			case "copy":
 			case "neg":
 				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
 				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
@@ -604,6 +604,7 @@ export class HMMMRuntime extends EventEmitter {
 					case "setn":
 					case "loadn":
 					case "loadr":
+					case "copy":
 					case "addn":
 					case "add":
 					case "neg":
@@ -708,7 +709,7 @@ export class HMMMRuntime extends EventEmitter {
 						this.setRegister(rX!, input);
 						break;
 					case "write":
-						this.instructionOutput('stdout', String.fromCharCode(this._registers[rX!]));
+						this.instructionOutput('stdout', HMMMRuntime.s16IntToNumber(this._registers[rX!]).toString());
 						break;
 					case "jumpr":
 						nextInstructionPointer = this._registers[rX!];
@@ -749,6 +750,10 @@ export class HMMMRuntime extends EventEmitter {
 						this.setRegister(rX!, this._registers[rX!] + N!);
 						break;
 					case "nop":
+						break;
+					case "copy":
+						oldData = this._registers[rX!];
+						this.setRegister(rX!, this._registers[rY!]);
 						break;
 					case "add":
 						oldData = this._registers[rX!];
@@ -881,7 +886,7 @@ export class HMMMRuntime extends EventEmitter {
 
 	private instructionOutput(category: "stdout" | "stderr", message: string) {
 		const line = this._instructionToSourceMap.get(this._instructionPointer);
-		this.sendEvent('output', category, message, line);
+		this.sendEvent('output', message, category, line);
 	}
 
 	private debuggerOutput(message: string) {

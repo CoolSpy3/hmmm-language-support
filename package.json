@@ -56,9 +56,7 @@
       {
         "type": "hmmm",
         "label": "HMMM Debug",
-        "program": "./client/out/debugadapter.js",
-        "runtime": "node",
-        "languages": [ "hmmm" ],
+        "languages": [ "hb", "hmmm" ],
         "configurationAttributes": {
           "launch": {
             "required": [ "program" ],

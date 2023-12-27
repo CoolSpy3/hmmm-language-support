@@ -345,9 +345,9 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
 
         lineMap.set(numCodeLines, i);
 
-        numCodeLines++;
-
         if(parseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
+
+        numCodeLines++;
 
         const instr = getInstructionByName(m[InstructionPart.INSTRUCTION]);
 

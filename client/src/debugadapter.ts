@@ -18,6 +18,8 @@ import { workspace } from 'vscode';
 import { binaryRegex, decompileInstruction } from '../../hmmm-spec/out/hmmm';
 import { HMMMRuntime } from './runtime';
 
+import { relative } from 'path';
+
 /**
  * This interface describes the hmmm-debug specific launch attributes
  * (which are not part of the Debug Adapter Protocol).
@@ -101,6 +103,7 @@ export class HMMMDebugSession extends DebugSession {
 		// build and return the capabilities of this debug adapter:
 		response.body = response.body || {};
 
+		// Adapter Capabilities
 		response.body.supportsConfigurationDoneRequest = true;
 
 		// Execution Capabilities
@@ -108,7 +111,6 @@ export class HMMMDebugSession extends DebugSession {
 		response.body.supportsStepBack = debuggingSettings.get("enableReverseExecution", false);
 
 		// Breakpoint Capabilities
-		response.body.supportsBreakpointLocationsRequest = true;
 		response.body.supportsDataBreakpoints = true;
 
 		// Stack/Variable Capabilities
@@ -178,7 +180,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		await Promise.race([
 			resolveOnConfigurationDone,
-			new Promise<void>(resolve => setTimeout(resolve, 5000)) // https://stackoverflow.com/a/51939030
+			new Promise<void>(resolve => setTimeout(resolve, 1000)) // https://stackoverflow.com/a/51939030
 		]);
 
 		// start the program in the runtime
@@ -213,11 +215,13 @@ export class HMMMDebugSession extends DebugSession {
 		const clientLines = args.lines ?? [];
 
 		if(!this.matchesSource(args.source.path)) {
-			response.body.breakpoints = clientLines.map(l => <DebugProtocol.Breakpoint>{
-				verified: false,
-				source: this._source,
-				line: l
-			});
+			response.body = {
+				breakpoints: clientLines.map(l => <DebugProtocol.Breakpoint>{
+					verified: false,
+					source: this._source,
+					line: l
+				})
+			};
 			this.sendResponse(response);
 			return;
 		}
@@ -226,26 +230,14 @@ export class HMMMDebugSession extends DebugSession {
 		this._runtime.clearBreakpoints();
 
 		// set and send back the breakpoint positions
-		response.body.breakpoints = clientLines.map(l => {
-			const bp = this._runtime.setBreakpoint(this.convertClientLineToDebugger(l));
-			bp.source = this._source;
-			return bp;
-		});
-		this.sendResponse(response);
-	}
-
-	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments): void {
-		if(!this.matchesSource(args.source.path)) {
-			this.sendResponse(response);
-			return;
-		}
-
-		response.body.breakpoints =
-			this._runtime.getValidInstructionLocations(
-				this.convertClientLineToDebugger(args.line),
-				args.endLine ? this.convertClientLineToDebugger(args.endLine) : undefined
-			).map(l => <DebugProtocol.BreakpointLocation>{ line: this.convertDebuggerLineToClient(l) });
-
+		response.body = {
+			breakpoints: clientLines.map(l => {
+				const bp = this._runtime.setBreakpoint(this.convertClientLineToDebugger(l));
+				bp.source = this._source;
+				bp.line = l;
+				return bp;
+			})
+		};
 		this.sendResponse(response);
 	}
 
@@ -261,7 +253,14 @@ export class HMMMDebugSession extends DebugSession {
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
 		response.body = this._runtime.getStack(args.startFrame, args.levels);
-		response.body.stackFrames.forEach(frame => frame.source = this._source);
+		response.body.stackFrames.forEach(frame => {
+			if(frame.line === -1) {
+				frame.line = 0;
+			} else {
+				frame.source = this._source;
+				frame.line = this.convertDebuggerLineToClient(frame.line);
+			}
+		});
 		this.sendResponse(response);
 	}
 
@@ -286,8 +285,8 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments) {
-		response.body.variables = [];
+	protected variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments) {
+		response.body = { variables: [] };
 
 		const parsedName = this.parseVariableName(this._variableHandles.get(args.variablesReference));
 		if(!parsedName) {
@@ -441,44 +440,46 @@ export class HMMMDebugSession extends DebugSession {
 		// clear all data breakpoints
 		this._runtime.clearAllDataBreakpoints();
 
-		response.body.breakpoints = args.breakpoints.map(bp => {
-			if(/$(r\d+|addr_\d+)/.test(bp.dataId) && bp.dataId !== "r0") {
-				const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
-				const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
+		response.body = {
+			breakpoints: args.breakpoints.map(bp => {
+				if(/$(r\d+|addr_\d+)/.test(bp.dataId) && bp.dataId !== "r0") {
+					const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
+					const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
 
-				if(bp.dataId.startsWith("addr_")) {
-					const address = parseInt(bp.dataId.substring("addr_".length));
-					if(isNaN(address) || address < 0 || address > 255) {
+					if(bp.dataId.startsWith("addr_")) {
+						const address = parseInt(bp.dataId.substring("addr_".length));
+						if(isNaN(address) || address < 0 || address > 255) {
+							return <DebugProtocol.Breakpoint> {
+								verified: false,
+								message: `${address} is not a valid memory address.`
+							};
+						}
 						return <DebugProtocol.Breakpoint> {
-							verified: false,
-							message: `${address} is not a valid memory address.`
-						};
-					}
-					return <DebugProtocol.Breakpoint> {
-						id: this._runtime.setDataBreakpoint(address, "memory", onRead, onWrite),
-						verified: true,
-						description: `Memory Address ${address}`
-					}
-				} else {
-					const register = parseInt(bp.dataId.substring(1));
-					if(isNaN(register) || register < 0 || register > 15) {
+							id: this._runtime.setDataBreakpoint(address, "memory", onRead, onWrite),
+							verified: true,
+							description: `Memory Address ${address}`
+						}
+					} else {
+						const register = parseInt(bp.dataId.substring(1));
+						if(isNaN(register) || register < 0 || register > 15) {
+							return <DebugProtocol.Breakpoint> {
+								verified: false,
+								message: `${register} is not a valid register.`
+							};
+						}
 						return <DebugProtocol.Breakpoint> {
-							verified: false,
-							message: `${register} is not a valid register.`
-						};
-					}
-					return <DebugProtocol.Breakpoint> {
-						id: this._runtime.setDataBreakpoint(register, "register", onRead, onWrite),
-						verified: true,
-						description: `Register ${register}`
+							id: this._runtime.setDataBreakpoint(register, "register", onRead, onWrite),
+							verified: true,
+							description: `Register ${register}`
+						}
 					}
 				}
-			}
-			return <DebugProtocol.Breakpoint> {
-				verified: false,
-				message: `Data breakpoints can only be set on memory addresses and general purpose registers.`
-			};
-		});
+				return <DebugProtocol.Breakpoint> {
+					verified: false,
+					message: `Data breakpoints can only be set on memory addresses and general purpose registers.`
+				};
+			})
+		};
 
 		this.sendResponse(response);
 	}
@@ -576,10 +577,12 @@ export class HMMMDebugSession extends DebugSession {
 			if(isNaN(register) || register < 0 || register > 15) return undefined;
 			value = frame.registers[register];
 			attributes = register === 0 ? [ "constant", "readOnly" ] : undefined;
+			numChildren = 5;
 		} else if(name.startsWith('addr_')) {
 			const address = parseInt(name.substring('addr_'.length));
 			if(isNaN(address) || address < 0 || address > 255) return undefined;
-			value = HMMMDebugSession.formatValue(frame.memory[address], true, hex);
+			value = frame.memory[address];
+			numChildren = 6;
 		} else {
 			return undefined;
 		}
@@ -591,7 +594,9 @@ export class HMMMDebugSession extends DebugSession {
 				stringValue = HMMMDebugSession.formatValue(value, false, true);
 				numChildren = 0;
 			} else if(format === "binary") {
+				displayName = "Binary Value";
 				stringValue = value.toString(2).padStart(16, "0").replace(binaryRegex, "$1 $2 $3 $4");
+				numChildren = 0;
 			} else if(format === "signed") {
 				displayName = "Signed Value";
 				stringValue = HMMMDebugSession.formatValue(value, true, false);
@@ -620,7 +625,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		if(stackFrame !== -1) attributes = HMMMDebugSession.withReadOnly(attributes);
 
-		const evaluateName = `frame_${frame}.${name}${format ? `.${format}` : ""}`;
+		const evaluateName = `frame_${stackFrame}.${name}${format ? `.${format}` : ""}`;
 		return <DebugProtocol.Variable> {
 			name: displayName,
 			value: stringValue,
@@ -688,8 +693,8 @@ export class HMMMDebugSession extends DebugSession {
 		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, undefined);
 	}
 
-	private matchesSource(path: string | undefined) {
-		return path && path === (this._source?.path ?? undefined);
+	private matchesSource(otherPath: string | undefined) {
+		return otherPath && this._source?.path && relative(this._source.path, otherPath) === "";
 	}
 
 	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint["attributes"]): DebugProtocol.VariablePresentationHint["attributes"] {
