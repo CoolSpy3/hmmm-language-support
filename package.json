@@ -18,6 +18,32 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
+    "postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2",
+    "@vscode/test-cli": "^0.0.4",
+    "@vscode/test-electron": "^2.3.8"
+  },
+  "activationEvents": [
+    "onDebugResolve:hb",
+    "onDebugDynamicConfigurations:hb",
+    "onDebugResolve:hmmm",
+    "onDebugDynamicConfigurations:hmmm"
+  ],
   "contributes": {
     "breakpoints": [
       {
@@ -25,6 +51,13 @@
       },
       {
         "language": "hmmm"
+      }
+    ],
+    "commands": [
+      {
+        "command": "hmmm.build",
+        "title": "HMMM: Build Program",
+        "enablement": "editorLangId == 'hmmm'"
       }
     ],
     "configuration": {
@@ -99,6 +132,18 @@
         ]
       }
     ],
+    "grammars": [
+      {
+        "language": "hmmm",
+        "scopeName": "source.hmmm",
+        "path": "./syntaxes/hmmm.tmLanguage.json"
+      },
+      {
+        "language": "hb",
+        "scopeName": "source.hb",
+        "path": "./syntaxes/hb.tmLanguage.json"
+      }
+    ],
     "languages": [
       {
         "id": "hmmm",
@@ -113,37 +158,19 @@
         "configuration": "./syntaxes/hb-language-configuration.json"
       }
     ],
-    "grammars": [
-      {
-        "language": "hmmm",
-        "scopeName": "source.hmmm",
-        "path": "./syntaxes/hmmm.tmLanguage.json"
-      },
-      {
-        "language": "hb",
-        "scopeName": "source.hb",
-        "path": "./syntaxes/hb.tmLanguage.json"
-      }
-    ]
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -b",
-    "watch": "tsc -b -w",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
-    "postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
-    "test": "vscode-test"
-  },
-  "devDependencies": {
-    "@types/vscode": "^1.85.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
-    "@typescript-eslint/eslint-plugin": "^6.13.1",
-    "@typescript-eslint/parser": "^6.13.1",
-    "eslint": "^8.54.0",
-    "typescript": "^5.3.2",
-    "@vscode/test-cli": "^0.0.4",
-    "@vscode/test-electron": "^2.3.8"
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "hmmm.build",
+          "when": "editorLangId == 'hmmm'"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "hmmm.build",
+          "when": "editorLangId == 'hmmm'"
+        }
+      ]
+    }
   }
 }

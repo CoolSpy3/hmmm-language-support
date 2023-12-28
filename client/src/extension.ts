@@ -1,15 +1,18 @@
 // Language client sample modified from https://github.com/microsoft/vscode-extension-samples/blob/main/lsp-sample/client/src/extension.ts
 
 import * as path from 'path';
-import { ExtensionContext, debug } from 'vscode';
+import { ExtensionContext, TextEditor, commands, debug, window } from 'vscode';
 
+import { readFileSync, writeFileSync } from 'fs';
 import {
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
+import { compile } from '../../hmmm-spec/out/hmmm';
 import { HMMMDebugAdapterFactory } from './debugadapterfactory';
+import { HMMMDebugConfigurationProvider } from './debugconfigprovider';
 
 let hbClient: LanguageClient;
 let hmmmClient: LanguageClient;
@@ -61,8 +64,40 @@ export function activate(context: ExtensionContext) {
 		hmmmClient.start();
 	}
 
-	// Register the debug adapter
-	context.subscriptions.push(debug.registerDebugAdapterDescriptorFactory('hmmm', new HMMMDebugAdapterFactory()));
+	// Register the debugger
+	{
+		// Register the debug adapter
+		context.subscriptions.push(debug.registerDebugAdapterDescriptorFactory('hmmm', new HMMMDebugAdapterFactory()));
+
+		// Register the debug configuration provider
+		context.subscriptions.push(debug.registerDebugConfigurationProvider('hb', new HMMMDebugConfigurationProvider(true)));
+		context.subscriptions.push(debug.registerDebugConfigurationProvider('hmmm', new HMMMDebugConfigurationProvider(false)));
+	}
+
+	// Register the commands
+	{
+		context.subscriptions.push(commands.registerTextEditorCommand('hmmm.build', async (textEditor: TextEditor) => {
+			const inFile = textEditor.document.uri.fsPath;
+			const outFile = await window.showSaveDialog({
+				defaultUri: textEditor.document.uri.with({ path: `${inFile.substring(0, inFile.lastIndexOf('.'))}.hb` }),
+				filters: {
+					'HMMM Binary': ['hb'],
+					'All Files': ['*']
+				}
+			});
+
+			if (outFile) {
+				commands.executeCommand('workbench.action.files.save');
+				const code = readFileSync(inFile).toString().split('\n');
+				const compiledCode = compile(code);
+				if(!compiledCode) {
+					window.showErrorMessage('HMMM file contains errors. Please fix them before building.');
+					return;
+				}
+				writeFileSync(outFile.fsPath, compiledCode[0].join('\n') + '\n');
+			}
+		}));
+	}
 }
 
 export function deactivate(): Thenable<void> | undefined {
