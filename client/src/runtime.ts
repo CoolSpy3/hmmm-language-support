@@ -652,7 +652,7 @@ export class HMMMRuntime extends EventEmitter {
 					}
 				}
 
-				if(this._breakpoints.has(this._instructionPointer)) {
+				if(this._breakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
 					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
 					return;
 				}
@@ -681,8 +681,9 @@ export class HMMMRuntime extends EventEmitter {
 					return;
 				}
 
-				if(this._breakpoints.has(this._instructionPointer)) {
+				if(this._breakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
 					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
+					return;
 				}
 
 				if(this._pause) {

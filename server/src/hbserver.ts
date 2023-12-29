@@ -154,6 +154,7 @@ connection.languages.semanticTokens.on(
                 }
             }
 
+            let hasNumericOperand = false;
             switch(instruction.instruction.operand1) {
                 case HMMMOperandType.REGISTER:
                     {
@@ -164,10 +165,13 @@ connection.languages.semanticTokens.on(
                 case HMMMOperandType.SIGNED_NUMBER:
                 case HMMMOperandType.UNSIGNED_NUMBER:
                     {
+                        hasNumericOperand = true;
+                        tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
                         tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
                         tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
                         break;
                     }
+                case undefined:
                 default:
                     tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
             }
@@ -181,12 +185,16 @@ connection.languages.semanticTokens.on(
                 case HMMMOperandType.SIGNED_NUMBER:
                 case HMMMOperandType.UNSIGNED_NUMBER:
                     {
+                        hasNumericOperand = true;
                         tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
                         tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
                         break;
                     }
+                case undefined:
                 default:
-                    tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.keyword, 0);
+                    if(!hasNumericOperand) {
+                        tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.keyword, 0);
+                    }
             }
             switch(instruction.instruction.operand3) {
                 case HMMMOperandType.REGISTER:
@@ -197,11 +205,16 @@ connection.languages.semanticTokens.on(
                     }
                 case HMMMOperandType.SIGNED_NUMBER:
                 case HMMMOperandType.UNSIGNED_NUMBER:
-                    // Numbers are never the third operand, so this should never happen
-                    console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);
-                    break;
+                    {
+                        // Numbers are never the third operand, so this should never happen
+                        console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);
+                        break;
+                    }
+                case undefined:
                 default:
-                    tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.keyword, 0);
+                    if(!hasNumericOperand) {
+                        tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.keyword, 0);
+                    }
             }
         }
 
