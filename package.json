@@ -6,10 +6,15 @@
   "publisher": "CoolSpy3",
   "main": "./client/out/extension.js",
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers",
+    "Formatters",
+    "Linters"
   ],
   "keywords": [
-    "HMMM"
+    "HMMM",
+    "Harvey Mudd",
+    "Harvey Mudd Miniature Machine"
   ],
   "repository": {
     "type": "git",
