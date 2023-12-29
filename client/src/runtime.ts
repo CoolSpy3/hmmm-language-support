@@ -439,7 +439,12 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private executeInstructionReverse(stepInstruction?: string) {
-		const instructionInfo = this._instructionLog.shift()!;
+		const instructionInfo = this._instructionLog.shift();
+		if(!instructionInfo) {
+			this.sendEvent('stop', 'entry');
+			return;
+		}
+
 		this._instructionPointer = instructionInfo.address;
 
 		const parsedInstruction = this.getCurrentInstruction();
