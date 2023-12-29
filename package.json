@@ -1,8 +1,8 @@
 {
   "name": "hmmm-language-support",
   "displayName": "HMMM Language Support",
-  "description": "Adds HMMM language support to VSCode",
-  "version": "1.0.1",
+  "description": "A HMMM Syntax Highlighter, Debugger, Linter, and Formatter",
+  "version": "2.0.0",
   "publisher": "CoolSpy3",
   "main": "./client/out/extension.js",
   "categories": [
