@@ -312,7 +312,7 @@ export function decompileInstruction(instruction: string | number | ParsedHMMMIn
 
         instruction = parsedInstruction;
     }
-    return `${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === HMMMOperandType.REGISTER ? 'r' : ''}${operand.value}`).join(', ')}`;
+    return `${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === HMMMOperandType.REGISTER ? 'r' : ''}${operand.value}`).join(' ')}`;
 }
 
 /**

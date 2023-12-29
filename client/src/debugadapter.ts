@@ -122,6 +122,7 @@ export class HMMMDebugSession extends DebugSession {
 		response.body.supportsValueFormattingOptions = true;
 
 		// Exception Capabilities
+		response.body.supportsExceptionInfoRequest = true;
 		response.body.exceptionBreakpointFilters = [
 			{
 				filter: "invalid-instruction",
@@ -136,14 +137,14 @@ export class HMMMDebugSession extends DebugSession {
 				description: "Breaks if the program attempts to access a memory address that does not exist."
 			},
 			{
-				filter: "instruction-read",
-				label: "Instruction Read",
+				filter: "cs-read",
+				label: "Code Segment Read",
 				default: false,
 				description: "Breaks if the program attempts to read from an address inside the code segment."
 			},
 			{
-				filter: "instruction-write",
-				label: "Instruction Write",
+				filter: "cs-write",
+				label: "Code Segment Write",
 				default: true,
 				description: "Breaks if the program attempts to overwrite an instruction in memory."
 			},
@@ -154,7 +155,6 @@ export class HMMMDebugSession extends DebugSession {
 				description: "Breaks if the program attempts to execute an instruction outside of the code segment."
 			}
 		];
-		response.body.supportsExceptionInfoRequest = true;
 
 		this.sendResponse(response);
 	}
@@ -438,7 +438,7 @@ export class HMMMDebugSession extends DebugSession {
 			return;
 		}
 
-		if (/$(r\d+|addr_\d+)/.test(name) && name !== "r0") {
+		if (/^(r\d+|addr_\d+)$/.test(name) && name !== "r0") {
 			response.body = {
 				dataId: name,
 				description: name.startsWith("addr_") ? `Memory Address ${name.substring("addr_".length)}` : `Register ${name.substring(1)}`,
@@ -457,7 +457,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		response.body = {
 			breakpoints: args.breakpoints.map(bp => {
-				if(/$(r\d+|addr_\d+)/.test(bp.dataId) && bp.dataId !== "r0") {
+				if(/^(r\d+|addr_\d+)$/.test(bp.dataId) && bp.dataId !== "r0") {
 					const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
 					const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
 

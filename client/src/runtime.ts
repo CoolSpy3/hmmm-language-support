@@ -75,11 +75,8 @@ export class HMMMRuntime extends EventEmitter {
 		return this._numInstructions;
 	}
 
-	// maps from sourceFile to array of breakpoints
-	private _sourceBreakpoints: DebugProtocol.Breakpoint[] = [];
-
 	// maps from instruction number to breakpoint ids
-	private _breakpoints = new Map<number, number>();
+	private _instructionBreakpoints = new Map<number, number>();
 
 	// since we want to send breakpoint events, we will assign an id to every event
 	// so that the frontend can match events with breakpoints.
@@ -91,6 +88,7 @@ export class HMMMRuntime extends EventEmitter {
 	private _memoryWriteBreakpoints = new Map<number, number>();
 
 	private _ignoreBreakpoints = false;
+	private _ignoredExceptions: string[] = [];
 
 	private _enabledExceptions = new Map<string, number>();
 	private _exception: string = "";
@@ -226,6 +224,7 @@ export class HMMMRuntime extends EventEmitter {
 		this.updateInstructionLog(true);
 		this._instructionPointer = instruction;
 		this._ignoreBreakpoints = false;
+		this._ignoredExceptions = [];
 		this.sendEvent('stop', 'goto');
 	}
 
@@ -279,7 +278,7 @@ export class HMMMRuntime extends EventEmitter {
 
 		if(this._sourceToInstructionMap.has(line)) {
 			bp.verified = true;
-			this._breakpoints.set(this._sourceToInstructionMap.get(line)!, bp.id!);
+			this._instructionBreakpoints.set(this._sourceToInstructionMap.get(line)!, bp.id!);
 		}
 
 		return bp;
@@ -289,14 +288,14 @@ export class HMMMRuntime extends EventEmitter {
 	 * Remove the breakpoint on the given line
 	 */
 	public clearBreakpoint(line: number): void {
-		if(this._sourceToInstructionMap.has(line)) this._breakpoints.delete(this._sourceToInstructionMap.get(line)!);
+		if(this._sourceToInstructionMap.has(line)) this._instructionBreakpoints.delete(this._sourceToInstructionMap.get(line)!);
 	}
 
 	/*
 	 * Clear all breakpoints
 	 */
 	public clearBreakpoints(): void {
-		this._breakpoints.clear();
+		this._instructionBreakpoints.clear();
 	}
 
 	/*
@@ -462,7 +461,11 @@ export class HMMMRuntime extends EventEmitter {
 	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false): boolean {
 		if (!accesses) accesses = this.determineAccesses();
 
-		ignoreNonCritical = ignoreNonCritical || this._ignoreBreakpoints;
+		if(!ignoreNonCritical && this._ignoreBreakpoints) {
+			ignoreNonCritical = true;
+			this._ignoreBreakpoints = false;
+			this._ignoredExceptions = [];
+		}
 
 		let hitBreakpoints: number[] = [];
 		for(const access of accesses) {
@@ -485,12 +488,12 @@ export class HMMMRuntime extends EventEmitter {
 				if(ignoreNonCritical) continue;
 
 				if(access.address < this._numInstructions) {
-					if(access.accessType === "read" && this._enabledExceptions.has("instruction-read")) {
+					if(access.accessType === "read") {
 						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}`;
-						if(this.onException("instruction-read", message, false)) return true;
-					} else if(access.accessType === "write" && this._enabledExceptions.has("instruction-write")) {
+						if(this.onException("cs-read", message, false)) return true;
+					} else if(access.accessType === "write") {
 						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}`;
-						if(this.onException("instruction-write", message, false)) return true;
+						if(this.onException("cs-write", message, false)) return true;
 					}
 				}
 
@@ -504,7 +507,7 @@ export class HMMMRuntime extends EventEmitter {
 		}
 
 		if(hitBreakpoints.length > 0) {
-			this.emit('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
+			this.sendEvent('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
 			return true;
 		}
 
@@ -568,6 +571,8 @@ export class HMMMRuntime extends EventEmitter {
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
 	private async run(reverse = false, stepInstruction?: string) {
+		this._pause = false;
+
 		if (reverse) {
 			if(!this._instructionLogEnabled) {
 				window.showErrorMessage(`Reverse Execution is not enabled`);
@@ -652,8 +657,8 @@ export class HMMMRuntime extends EventEmitter {
 					}
 				}
 
-				if(this._breakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
-					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
+				if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
 					return;
 				}
 
@@ -665,7 +670,6 @@ export class HMMMRuntime extends EventEmitter {
 				}
 
 				if(this._pause) {
-					this._pause = false;
 					this.sendEvent('stop', 'pause');
 					return;
 				}
@@ -675,20 +679,19 @@ export class HMMMRuntime extends EventEmitter {
 			this.sendEvent('stop', 'entry');
 		} else {
 			while (this._instructionPointer < 256) {
+				if(this._pause) {
+					this.sendEvent('stop', 'pause');
+					return;
+				}
+
 				if(this._instructionPointer >= this._numInstructions) {
 					const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
 					this.onException("execute-outside-cs", message, false);
 					return;
 				}
 
-				if(this._breakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
-					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._breakpoints.get(this._instructionPointer)!);
-					return;
-				}
-
-				if(this._pause) {
-					this._pause = false;
-					this.sendEvent('stop', 'pause');
+				if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
 					return;
 				}
 
@@ -886,8 +889,8 @@ export class HMMMRuntime extends EventEmitter {
 
 	private onException(exception: string, description: string, isCritical: boolean): boolean {
 		if(this._enabledExceptions.has(exception)) {
-			const exceptionId = this._enabledExceptions.get(exception)!;
-			if(!this._ignoreBreakpoints || isCritical) { // Critical exceptions should never be added to the hit breakpoints list, but just in case...
+			if(!this._ignoredExceptions.includes(exception) || isCritical) { // Critical exceptions should never be added to the hit breakpoints list, but just in case...
+				if(!isCritical) this._ignoredExceptions.push(exception);
 				this._exception = exception;
 				this._exceptionDescription = description;
 				this.sendEvent('stopOnBreakpoint', 'exception', this._enabledExceptions.get(exception)!);
