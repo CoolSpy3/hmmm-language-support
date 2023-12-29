@@ -33,21 +33,42 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	isBinary: boolean;
 }
 
+/**
+ * Perform a slice on an array with a start and count.
+ * @param array The array to slice
+ * @param start The start index or undefined to start at 0
+ * @param count The number of elements to slice or undefined to slice to the end of the array
+ * @returns The sliced array
+ */
 export function sliceWithCount<T>(array: T[], start?: number, count?: number): T[] {
 	return array.slice(start, (start ?? 0) + (count ?? array.length));
 }
 
-/// https://stackoverflow.com/a/14438954
+/**
+ * A filter function that removes duplicates from an array. (Copied from https://stackoverflow.com/a/14438954)
+ * @param value The value to check
+ * @param index The index of the value in the array
+ * @param array The array to filter from
+ * @returns True if the value at the given index is the first occurrence of the value in the array; false otherwise
+ */
 export function removeDuplicates<T>(value: T, index: number, array: T[]): boolean {
 	return array.indexOf(value) === index;
 }
 
+/**
+ * A debug adapter for the HMMM language.
+ */
 export class HMMMDebugSession extends DebugSession {
 
-	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
+	/**
+	 * We don't support multiple threads, so we can use a hardcoded ID for the default thread
+	 */
 	private static THREAD_ID = 1;
 
-	private _configurationDone: ((value: void | PromiseLike<void>) => void) | undefined = undefined;
+	/**
+	 *
+	 */
+	private _onConfigurationDone: (() => void) | undefined = undefined;
 	private _source: Source | undefined = undefined;
 
 	private _runtime: HMMMRuntime;
@@ -156,7 +177,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments): void {
-		this._configurationDone?.();
+		this._onConfigurationDone?.();
 
 		this.sendResponse(response);
 	}
@@ -173,17 +194,15 @@ export class HMMMDebugSession extends DebugSession {
 
 		this.sendResponse(response);
 
-		const resolveOnConfigurationDone = new Promise<void>(resolve => this._configurationDone = resolve);
+		this._onConfigurationDone = function() {
+			this._onConfigurationDone = undefined;
+
+			this._runtime.continue();
+		}
 
 		this.sendEvent(new InitializedEvent());
 
-		await Promise.race([
-			resolveOnConfigurationDone,
-			new Promise<void>(resolve => setTimeout(resolve, 1000)) // https://stackoverflow.com/a/51939030
-		]);
-
-		// start the program in the runtime
-		this._runtime.continue();
+		setTimeout(_ => this._onConfigurationDone?.(), 1000);
 	}
 
 	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
