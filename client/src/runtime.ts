@@ -87,13 +87,11 @@ export class HMMMRuntime extends EventEmitter {
 		return this._instructionPointer;
 	}
 
-	private _pause = false;
-	public get paused() {
-		return this._pause;
-	}
+	private _queuedInstructionExecution: NodeJS.Immediate | undefined = undefined;
 
 	public pause() {
-		this._pause = true;
+		clearImmediate(this._queuedInstructionExecution);
+		this.sendEvent('stop', 'pause');
 	}
 
 	private _registers: number[] = Array(16).fill(0);
@@ -251,7 +249,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
 	private run(reverse = false, stepInstruction?: string) {
-		this._pause = false;
+		if(this._queuedInstructionExecution) return;
 
 		if (reverse) {
 			if (!this._instructionLogEnabled) {
@@ -260,18 +258,13 @@ export class HMMMRuntime extends EventEmitter {
 				return;
 			}
 
-			setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
+			this._queuedInstructionExecution = setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
 		} else {
-			setImmediate(this.executeInstruction.bind(this, stepInstruction));
+			this._queuedInstructionExecution = setImmediate(this.executeInstruction.bind(this, stepInstruction));
 		}
 	}
 
 	private async executeInstruction(stepInstruction?: string) {
-		if (this._pause) {
-			this.sendEvent('stop', 'pause');
-			return;
-		}
-
 		if (this._instructionPointer >= this._numInstructions) {
 			const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
 			this.onException("execute-outside-cs", message, false);
@@ -442,7 +435,7 @@ export class HMMMRuntime extends EventEmitter {
 			return;
 		}
 
-		setImmediate(this.executeInstruction.bind(this, stepInstruction));
+		this._queuedInstructionExecution = setImmediate(this.executeInstruction.bind(this, stepInstruction));
 	}
 
 	private executeInstructionReverse(stepInstruction?: string) {
@@ -534,12 +527,7 @@ export class HMMMRuntime extends EventEmitter {
 			return;
 		}
 
-		if (this._pause) {
-			this.sendEvent('stop', 'pause');
-			return;
-		}
-
-		setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
+		this._queuedInstructionExecution = setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
 	}
 
 	//#endregion
@@ -976,6 +964,9 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private sendEvent(event: string, ...args: any[]) {
+		if(event === 'stop' || event === 'stopOnBreakpoint') {
+			this._queuedInstructionExecution = undefined;
+		}
 		if (event === 'stopOnBreakpoint' || (args.length > 0 && args[0] === 'step')) {
 			this._ignoreBreakpoints = true;
 		}
