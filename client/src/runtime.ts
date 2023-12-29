@@ -570,7 +570,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * Run through the file.
 	 * If stepEvent is specified only run a single step and emit the stepEvent.
 	 */
-	private async run(reverse = false, stepInstruction?: string) {
+	private run(reverse = false, stepInstruction?: string) {
 		this._pause = false;
 
 		if (reverse) {
@@ -580,283 +580,286 @@ export class HMMMRuntime extends EventEmitter {
 				return;
 			}
 
-			while (this._instructionLog.length > 0) {
-				const instructionInfo = this._instructionLog.shift()!;
-				this._instructionPointer = instructionInfo.address;
-
-				const parsedInstruction = this.getCurrentInstruction();
-
-				if(!parsedInstruction) {
-					this.onInvalidInstruction();
-					return;
-				}
-
-				const [_binaryInstruction, instruction, rX, rY, _rZ, N] = this.getCurrentInstruction()!;
-
-				if(instructionInfo.didCreateStackFrame) {
-					if(this._stack.length === 0) {
-						this.debuggerOutput('WARNING: Stack Underflow');
-					} else {
-						this._stack.shift();
-					}
-				}
-
-				const oldData = instructionInfo.oldData;
-				if(oldData !== undefined) {
-					switch(instruction.instruction.name) {
-						case "halt":
-							this.sendEvent('end');
-							return;
-						case "write":
-						case "jumpr":
-						case "nop":
-						case "jumpn":
-						case "jeqzn":
-						case "jnezn":
-						case "jgtzn":
-						case "jltzn":
-							// These instructions don't change registers or memory, so we don't need to restore anything
-							break;
-						case "read":
-						case "setn":
-						case "loadn":
-						case "loadr":
-						case "copy":
-						case "addn":
-						case "add":
-						case "neg":
-						case "sub":
-						case "mul":
-						case "div":
-						case "mod":
-						case "calln":
-							// Restore rX
-							this.setRegister(rX!, oldData!);
-							break;
-						case "storen":
-							// Restore memory[N]
-							this.setMemory(N!, oldData!);
-							break;
-						case "storer":
-							// Restore memory[rY]
-							this.setMemory(this._registers[rY!], oldData!);
-							break;
-						case "popr":
-							// Restore rX and increment rY
-							this.setRegister(rX!, oldData!);
-							this.setRegister(rY!, this._registers[rY!] + 1);
-							break;
-						case "pushr":
-							// Decrement rY and restore memory[rY]
-							this.setRegister(rY!, this._registers[rY!] - 1);
-							this.setMemory(this._registers[rY!], oldData!);
-							break;
-						default:
-							this.onInvalidInstruction();
-							return;
-					}
-				}
-
-				if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
-					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
-					return;
-				}
-
-				if(this.checkAccesses()) return;
-
-				if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
-					this.sendEvent('stop', 'step');
-					return;
-				}
-
-				if(this._pause) {
-					this.sendEvent('stop', 'pause');
-					return;
-				}
-			}
-
-			// no more instructions
-			this.sendEvent('stop', 'entry');
+			setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
 		} else {
-			while (this._instructionPointer < 256) {
-				if(this._pause) {
-					this.sendEvent('stop', 'pause');
+			setImmediate(this.executeInstruction.bind(this, stepInstruction));
+		}
+	}
+
+	private async executeInstruction(stepInstruction?: string) {
+		if(this._pause) {
+			this.sendEvent('stop', 'pause');
+			return;
+		}
+
+		if(this._instructionPointer >= this._numInstructions) {
+			const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
+			this.onException("execute-outside-cs", message, false);
+			return;
+		}
+
+		if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+			this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
+			return;
+		}
+
+		if(this.checkInstructionExecutionAccess()) return;
+
+		const parsedInstruction = this.getCurrentInstruction();
+
+		if(!parsedInstruction) {
+			this.onInvalidInstruction();
+			return;
+		}
+
+		if(this.checkAccesses()) return;
+
+		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
+
+		let createStackFrame = false;
+		let oldData: number | undefined = undefined;
+		let nextInstructionPointer: number | undefined = undefined;
+
+		switch(instruction.instruction.name) {
+			case "halt":
+				this.sendEvent('end');
+				return;
+			case "read":
+				oldData = this._registers[rX!];
+				const input = parseInt(await window.showInputBox(<InputBoxOptions> {
+					placeHolder: `Enter a number to store into r${rX}`,
+					prompt: `You can also type any non-numerical text to terminate the program.`,
+					title: `HMMM: ${this._instructionPointer} ${decompileInstruction(instruction)}`
+				}) ?? '');
+				if(isNaN(input)) {
+					this.sendEvent('end');
 					return;
 				}
-
-				if(this._instructionPointer >= this._numInstructions) {
-					const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
-					this.onException("execute-outside-cs", message, false);
-					return;
+				this.setRegister(rX!, input);
+				break;
+			case "write":
+				this.instructionOutput('stdout', HMMMRuntime.s16IntToNumber(this._registers[rX!]).toString());
+				break;
+			case "jumpr":
+				nextInstructionPointer = this._registers[rX!];
+				createStackFrame = true;
+				break;
+			case "setn":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, N!);
+				break;
+			case "loadn":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._memory[N!]);
+				break;
+			case "storen":
+				oldData = this._memory[N!];
+				this.setMemory(N!, this._registers[rX!]);
+				break;
+			case "loadr":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._memory[this._registers[rY!]]);
+				break;
+			case "storer":
+				oldData = this._memory[this._registers[rY!]];
+				this.setMemory(this._registers[rY!], this._registers[rX!]);
+				break;
+			case "popr":
+				oldData = this._registers[rX!];
+				this.setRegister(rY!, this._registers[rY!] - 1);
+				this.setRegister(rX!, this._memory[this._registers[rY!]]);
+				break;
+			case "pushr":
+				oldData = this._memory[this._registers[rY!]];
+				this.setMemory(this._registers[rY!], this._registers[rX!]);
+				this.setRegister(rY!, this._registers[rY!] + 1);
+				break;
+			case "addn":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rX!] + N!);
+				break;
+			case "nop":
+				break;
+			case "copy":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rY!]);
+				break;
+			case "add":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rY!] + this._registers[rZ!]);
+				break;
+			case "neg":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, -this._registers[rY!]);
+				break;
+			case "sub":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rY!] - this._registers[rZ!]);
+				break;
+			case "mul":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rY!] * this._registers[rZ!]);
+				break;
+			case "div":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, Math.floor(this._registers[rY!] / this._registers[rZ!]));
+				break;
+			case "mod":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._registers[rY!] % this._registers[rZ!]);
+				break;
+			case "jumpn":
+				nextInstructionPointer = N!;
+				createStackFrame = true;
+				break;
+			case "calln":
+				oldData = this._registers[rX!];
+				this.setRegister(rX!, this._instructionPointer + 1);
+				nextInstructionPointer = N!;
+				createStackFrame = true;
+				break;
+			case "jeqzn":
+				if(this._registers[rX!] === 0) {
+					nextInstructionPointer = N!;
+					createStackFrame = true;
 				}
-
-				if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
-					this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
-					return;
+				break;
+			case "jnezn":
+				if(this._registers[rX!] !== 0) {
+					nextInstructionPointer = N!;
+					createStackFrame = true;
 				}
+				break;
+			case "jgtzn":
+				if(this._registers[rX!] > 0) {
+					nextInstructionPointer = N!;
+					createStackFrame = true;
+				}
+				break;
+			case "jltzn":
+				if(this._registers[rX!] < 0) {
+					nextInstructionPointer = N!;
+					createStackFrame = true;
+				}
+				break;
+			default:
+				this.onInvalidInstruction();
+				return;
+		}
 
-				if(this.checkInstructionExecutionAccess()) return;
+		if(createStackFrame) {
+			this.createStackFrame();
+		}
+		this.updateInstructionLog(createStackFrame, oldData);
+		if(nextInstructionPointer !== undefined) {
+			this._instructionPointer = nextInstructionPointer;
+		} else {
+			this._instructionPointer++;
+		}
 
-				const parsedInstruction = this.getCurrentInstruction();
+		if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
+			this.sendEvent('stop', 'step');
+			return;
+		}
 
-				if(!parsedInstruction) {
+		setImmediate(this.executeInstruction.bind(this, stepInstruction));
+	}
+
+	private executeInstructionReverse(stepInstruction?: string) {
+		const instructionInfo = this._instructionLog.shift()!;
+		this._instructionPointer = instructionInfo.address;
+
+		const parsedInstruction = this.getCurrentInstruction();
+
+		if(!parsedInstruction) {
+			this.onInvalidInstruction();
+			return;
+		}
+
+		const [_binaryInstruction, instruction, rX, rY, _rZ, N] = this.getCurrentInstruction()!;
+
+		if(instructionInfo.didCreateStackFrame) {
+			if(this._stack.length === 0) {
+				this.debuggerOutput('WARNING: Stack Underflow');
+			} else {
+				this._stack.shift();
+			}
+		}
+
+		const oldData = instructionInfo.oldData;
+		if(oldData !== undefined) {
+			switch(instruction.instruction.name) {
+				case "halt":
+					this.sendEvent('end');
+					return;
+				case "write":
+				case "jumpr":
+				case "nop":
+				case "jumpn":
+				case "jeqzn":
+				case "jnezn":
+				case "jgtzn":
+				case "jltzn":
+					// These instructions don't change registers or memory, so we don't need to restore anything
+					break;
+				case "read":
+				case "setn":
+				case "loadn":
+				case "loadr":
+				case "copy":
+				case "addn":
+				case "add":
+				case "neg":
+				case "sub":
+				case "mul":
+				case "div":
+				case "mod":
+				case "calln":
+					// Restore rX
+					this.setRegister(rX!, oldData!);
+					break;
+				case "storen":
+					// Restore memory[N]
+					this.setMemory(N!, oldData!);
+					break;
+				case "storer":
+					// Restore memory[rY]
+					this.setMemory(this._registers[rY!], oldData!);
+					break;
+				case "popr":
+					// Restore rX and increment rY
+					this.setRegister(rX!, oldData!);
+					this.setRegister(rY!, this._registers[rY!] + 1);
+					break;
+				case "pushr":
+					// Decrement rY and restore memory[rY]
+					this.setRegister(rY!, this._registers[rY!] - 1);
+					this.setMemory(this._registers[rY!], oldData!);
+					break;
+				default:
 					this.onInvalidInstruction();
 					return;
-				}
-
-				if(this.checkAccesses()) return;
-
-				const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
-
-				let createStackFrame = false;
-				let oldData: number | undefined = undefined;
-				let nextInstructionPointer: number | undefined = undefined;
-
-				switch(instruction.instruction.name) {
-					case "halt":
-						this.sendEvent('end');
-						return;
-					case "read":
-						oldData = this._registers[rX!];
-						const input = parseInt(await window.showInputBox(<InputBoxOptions> {
-							placeHolder: `Enter a number to store into r${rX}`,
-							prompt: `You can also type any non-numerical text to terminate the program.`,
-							title: `HMMM: ${this._instructionPointer} ${decompileInstruction(instruction)}`
-						}) ?? '');
-						if(isNaN(input)) {
-							this.sendEvent('end');
-							return;
-						}
-						this.setRegister(rX!, input);
-						break;
-					case "write":
-						this.instructionOutput('stdout', HMMMRuntime.s16IntToNumber(this._registers[rX!]).toString());
-						break;
-					case "jumpr":
-						nextInstructionPointer = this._registers[rX!];
-						createStackFrame = true;
-						break;
-					case "setn":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, N!);
-						break;
-					case "loadn":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._memory[N!]);
-						break;
-					case "storen":
-						oldData = this._memory[N!];
-						this.setMemory(N!, this._registers[rX!]);
-						break;
-					case "loadr":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._memory[this._registers[rY!]]);
-						break;
-					case "storer":
-						oldData = this._memory[this._registers[rY!]];
-						this.setMemory(this._registers[rY!], this._registers[rX!]);
-						break;
-					case "popr":
-						oldData = this._registers[rX!];
-						this.setRegister(rY!, this._registers[rY!] - 1);
-						this.setRegister(rX!, this._memory[this._registers[rY!]]);
-						break;
-					case "pushr":
-						oldData = this._memory[this._registers[rY!]];
-						this.setMemory(this._registers[rY!], this._registers[rX!]);
-						this.setRegister(rY!, this._registers[rY!] + 1);
-						break;
-					case "addn":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rX!] + N!);
-						break;
-					case "nop":
-						break;
-					case "copy":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rY!]);
-						break;
-					case "add":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rY!] + this._registers[rZ!]);
-						break;
-					case "neg":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, -this._registers[rY!]);
-						break;
-					case "sub":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rY!] - this._registers[rZ!]);
-						break;
-					case "mul":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rY!] * this._registers[rZ!]);
-						break;
-					case "div":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, Math.floor(this._registers[rY!] / this._registers[rZ!]));
-						break;
-					case "mod":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._registers[rY!] % this._registers[rZ!]);
-						break;
-					case "jumpn":
-						nextInstructionPointer = N!;
-						createStackFrame = true;
-						break;
-					case "calln":
-						oldData = this._registers[rX!];
-						this.setRegister(rX!, this._instructionPointer + 1);
-						nextInstructionPointer = N!;
-						createStackFrame = true;
-						break;
-					case "jeqzn":
-						if(this._registers[rX!] === 0) {
-							nextInstructionPointer = N!;
-							createStackFrame = true;
-						}
-						break;
-					case "jnezn":
-						if(this._registers[rX!] !== 0) {
-							nextInstructionPointer = N!;
-							createStackFrame = true;
-						}
-						break;
-					case "jgtzn":
-						if(this._registers[rX!] > 0) {
-							nextInstructionPointer = N!;
-							createStackFrame = true;
-						}
-						break;
-					case "jltzn":
-						if(this._registers[rX!] < 0) {
-							nextInstructionPointer = N!;
-							createStackFrame = true;
-						}
-						break;
-					default:
-						this.onInvalidInstruction();
-						return;
-				}
-
-				if(createStackFrame) {
-					this.createStackFrame();
-				}
-				this.updateInstructionLog(createStackFrame, oldData);
-				if(nextInstructionPointer !== undefined) {
-					this._instructionPointer = nextInstructionPointer;
-				} else {
-					this._instructionPointer++;
-				}
-
-				if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
-					this.sendEvent('stop', 'step');
-					return;
-				}
 			}
-			// no more lines
-			this.sendEvent('end');
 		}
+
+		if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+			this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
+			return;
+		}
+
+		if(this.checkAccesses()) return;
+
+		if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
+			this.sendEvent('stop', 'step');
+			return;
+		}
+
+		if(this._pause) {
+			this.sendEvent('stop', 'pause');
+			return;
+		}
+
+		setImmediate(this.executeInstructionReverse.bind(this, stepInstruction));
 	}
 
 	private createStackFrame() {
@@ -914,7 +917,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private sendEvent(event: string, ... args: any[]) {
-		if(event === 'stopOnBreakpoint')  {
+		if(event === 'stopOnBreakpoint' || (args.length > 0 && args[0] === 'step'))  {
 			this._ignoreBreakpoints = true;
 		}
 		setImmediate(_ => {
