@@ -226,6 +226,11 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
+	protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments): void {
+		this._runtime.pause();
+		this.sendResponse(response);
+	}
+
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
 		const clientLines = args.lines ?? [];
 
