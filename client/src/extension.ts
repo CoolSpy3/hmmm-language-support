@@ -23,6 +23,10 @@ import { HMMMDebugAdapterFactory, HMMMDebugConfigurationProvider } from './helpe
 let hbClient: LanguageClient;
 let hmmmClient: LanguageClient;
 
+/**
+ * Activates the extension by registering all language features with VSCode.
+ * @param context The extension context
+ */
 export function activate(context: ExtensionContext) {
 	// Start the language servers
 	{
@@ -84,6 +88,7 @@ export function activate(context: ExtensionContext) {
 		context.subscriptions.push(commands.registerTextEditorCommand('hmmm.build', async (textEditor: TextEditor) => {
 			const inFile = textEditor.document.uri.fsPath;
 			const outFile = await window.showSaveDialog({
+				// By default, suggest the same name as the input file, but with a .hb extension
 				defaultUri: textEditor.document.uri.with({ path: `${inFile.substring(0, inFile.lastIndexOf('.'))}.hb` }),
 				filters: {
 					'HMMM Binary': ['hb'],
@@ -91,7 +96,9 @@ export function activate(context: ExtensionContext) {
 				}
 			});
 
+			// If the user selected a file, save the file and compile it
 			if (outFile) {
+				// Save the file before building
 				commands.executeCommand('workbench.action.files.save');
 				const code = readFileSync(inFile).toString().split('\n');
 				const compiledCode = compile(code);
@@ -99,12 +106,15 @@ export function activate(context: ExtensionContext) {
 					window.showErrorMessage('HMMM file contains errors. Please fix them before building.');
 					return;
 				}
-				writeFileSync(outFile.fsPath, compiledCode[0].join('\n') + '\n');
+				writeFileSync(outFile.fsPath, compiledCode[0].join('\n') + '\n'); // Add an extra newline at the end of the file
 			}
 		}));
 	}
 }
 
+/**
+ * Deactivates the extension by stopping the language servers.
+ */
 export function deactivate(): Thenable<void> | undefined {
 	if (!hbClient && !hmmmClient) {
 		return undefined;
