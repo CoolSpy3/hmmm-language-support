@@ -78,10 +78,6 @@ export class HMMMDebugSession extends DebugSession {
 		this._runtime.on('breakpointValidated', (bp: DebugProtocol.Breakpoint) => {
 			this.sendEvent(new BreakpointEvent('changed', bp));
 		});
-		this._runtime.on('debuggerOutput', (text) => {
-			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
-			this.sendEvent(e);
-		});
 		this._runtime.on('output', (text, type, line) => {
 			const e: DebugProtocol.OutputEvent = new OutputEvent(`${text}\n`);
 			e.body.category = type;

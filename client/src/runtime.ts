@@ -913,7 +913,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private debuggerOutput(message: string) {
-		this.sendEvent('output', 'console', message, undefined);
+		this.sendEvent('output', message, 'console', undefined);
 	}
 
 	private sendEvent(event: string, ... args: any[]) {
