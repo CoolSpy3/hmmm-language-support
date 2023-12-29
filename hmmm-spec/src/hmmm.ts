@@ -70,7 +70,7 @@ export let hmmmAliases = new Map<string, string>([
 ]);
 
 export function getInstructionByName(name: string): HMMMInstruction | undefined {
-    if(hmmmAliases.has(name)) name = hmmmAliases.get(name)!; // Get the instruction name from the alias map if it exists (otherwise use the original name
+    if (hmmmAliases.has(name)) name = hmmmAliases.get(name)!; // Get the instruction name from the alias map if it exists (otherwise use the original name
     return hmmmInstructions.find(instr => instr.name === name);
 }
 
@@ -165,7 +165,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     rep = rep.padEnd(19, ' '); // Shouldn't be necessary, but just in case
 
     if (instr.operand1) {
-        if(instr.operand1 === HMMMOperandType.REGISTER) {
+        if (instr.operand1 === HMMMOperandType.REGISTER) {
             rep = `${rep.substring(0, 4)} XXXX ${rep.substring(10)}`;
         } else {
             rep = `${rep.substring(0, 9)} NNNN NNNN`;
@@ -173,7 +173,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     }
 
     if (instr.operand2) {
-        if(instr.operand2 === HMMMOperandType.REGISTER) {
+        if (instr.operand2 === HMMMOperandType.REGISTER) {
             rep = `${rep.substring(0, 9)} YYYY ${rep.substring(15)}`;
         } else {
             rep = `${rep.substring(0, 9)} NNNN NNNN`;
@@ -181,7 +181,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     }
 
     if (instr.operand3) {
-        if(instr.operand3 === HMMMOperandType.REGISTER) {
+        if (instr.operand3 === HMMMOperandType.REGISTER) {
             rep = `${rep.substring(0, 14)} ZZZZ`;
         } else {
             // All numbers are represented with 8 bits, so the third argument cannot be a number
@@ -239,7 +239,7 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
     // Get the instruction
     let opcode: number;
     let line: string;
-    if(typeof instruction === 'string') {
+    if (typeof instruction === 'string') {
         // Remove all whitespace from the line and ensure it only contains binary
         instruction = instruction.replace(/[^01]/g, '');
 
@@ -269,7 +269,7 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
      * @returns The parsed operand
      */
     function parseOperand(operandType: HMMMOperandType, operand: string): ParsedHMMMOperand {
-        switch(operandType) {
+        switch (operandType) {
             case HMMMOperandType.REGISTER:
                 return { type: HMMMOperandType.REGISTER, value: parseInt(operand, 2) };
             case HMMMOperandType.SIGNED_NUMBER:
@@ -288,7 +288,7 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
     }
 
     if (instr.operand3) {
-        if(instr.operand3 === HMMMOperandType.SIGNED_NUMBER || instr.operand3 === HMMMOperandType.UNSIGNED_NUMBER) {
+        if (instr.operand3 === HMMMOperandType.SIGNED_NUMBER || instr.operand3 === HMMMOperandType.UNSIGNED_NUMBER) {
             // All numbers are represented with 8 bits, so the third argument cannot be a number
             console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
         } else {
@@ -305,10 +305,10 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
  * @returns The decompiled instruction
  */
 export function decompileInstruction(instruction: string | number | ParsedHMMMInstruction): string | undefined {
-    if(typeof instruction === 'string' || typeof instruction === 'number') {
+    if (typeof instruction === 'string' || typeof instruction === 'number') {
         const parsedInstruction = parseBinaryInstruction(instruction);
 
-        if(!parsedInstruction) return undefined;
+        if (!parsedInstruction) return undefined;
 
         instruction = parsedInstruction;
     }
@@ -338,73 +338,73 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
     for (let i = 0; i < code.length; i++) {
         const line = preprocessLine(code[i]).trim();
 
-        if(!line) continue; // Skip empty lines
+        if (!line) continue; // Skip empty lines
 
         let m: RegExpExecArray | null;
-        if(!(m = instructionRegex.exec(line)) || m[InstructionPart.OTHER]) return undefined; // Invalid instruction!
+        if (!(m = instructionRegex.exec(line)) || m[InstructionPart.OTHER]) return undefined; // Invalid instruction!
 
         lineMap.set(numCodeLines, i);
 
-        if(parseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
+        if (parseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
 
         numCodeLines++;
 
         const instr = getInstructionByName(m[InstructionPart.INSTRUCTION]);
 
-        if(!instr) return undefined; // Invalid instruction!
+        if (!instr) return undefined; // Invalid instruction!
 
         let binary = instr.opcode;
 
-        if(instr.operand1) {
+        if (instr.operand1) {
             const operand = validateOperand(m[InstructionPart.OPERAND1]);
 
-            if(operand === undefined) return undefined; // Invalid operand!
+            if (operand === undefined) return undefined; // Invalid operand!
 
-            switch(instr.operand1) {
+            switch (instr.operand1) {
                 case HMMMOperandType.REGISTER:
-                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND1].slice(1)) << 8;
                     break;
                 case HMMMOperandType.SIGNED_NUMBER:
-                    if(!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
                     break;
                 case HMMMOperandType.UNSIGNED_NUMBER:
-                    if(!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
                     break;
             }
-        } else if(m[InstructionPart.OPERAND1]) return undefined; // Invalid operand!
+        } else if (m[InstructionPart.OPERAND1]) return undefined; // Invalid operand!
 
-        if(instr.operand2) {
+        if (instr.operand2) {
             const operand = validateOperand(m[InstructionPart.OPERAND2]);
 
-            if(operand === undefined) return undefined; // Invalid operand!
+            if (operand === undefined) return undefined; // Invalid operand!
 
-            switch(instr.operand2) {
+            switch (instr.operand2) {
                 case HMMMOperandType.REGISTER:
-                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND2].slice(1)) << 4;
                     break;
                 case HMMMOperandType.SIGNED_NUMBER:
-                    if(!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
                     break;
                 case HMMMOperandType.UNSIGNED_NUMBER:
-                    if(!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
                     break;
             }
-        } else if(m[InstructionPart.OPERAND2]) return undefined; // Invalid operand!
+        } else if (m[InstructionPart.OPERAND2]) return undefined; // Invalid operand!
 
-        if(instr.operand3) {
+        if (instr.operand3) {
             const operand = validateOperand(m[InstructionPart.OPERAND3]);
 
-            if(operand === undefined) return undefined; // Invalid operand!
+            if (operand === undefined) return undefined; // Invalid operand!
 
-            switch(instr.operand3) {
+            switch (instr.operand3) {
                 case HMMMOperandType.REGISTER:
-                    if(!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
+                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
                     binary |= parseInt(m[InstructionPart.OPERAND3].slice(1));
                     break;
                 case HMMMOperandType.SIGNED_NUMBER:
@@ -413,7 +413,7 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
                     console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
                     return undefined;
             }
-        } else if(m[InstructionPart.OPERAND3]) return undefined; // Invalid operand!
+        } else if (m[InstructionPart.OPERAND3]) return undefined; // Invalid operand!
 
         compiledCode.push(binary.toString(2).padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4"));
     }

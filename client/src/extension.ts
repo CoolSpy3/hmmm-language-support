@@ -1,9 +1,16 @@
 // Language client sample modified from https://github.com/microsoft/vscode-extension-samples/blob/main/lsp-sample/client/src/extension.ts
 
-import * as path from 'path';
-import { DebugConfigurationProviderTriggerKind, ExtensionContext, TextEditor, commands, debug, window } from 'vscode';
+import {
+	DebugConfigurationProviderTriggerKind,
+	ExtensionContext,
+	TextEditor,
+	commands,
+	debug,
+	window
+} from 'vscode';
 
 import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import {
 	LanguageClient,
 	LanguageClientOptions,
@@ -11,8 +18,7 @@ import {
 	TransportKind
 } from 'vscode-languageclient/node';
 import { compile } from '../../hmmm-spec/out/hmmm';
-import { HMMMDebugAdapterFactory } from './debugadapterfactory';
-import { HMMMDebugConfigurationProvider } from './debugconfigprovider';
+import { HMMMDebugAdapterFactory, HMMMDebugConfigurationProvider } from './helperclasses';
 
 let hbClient: LanguageClient;
 let hmmmClient: LanguageClient;
@@ -20,8 +26,8 @@ let hmmmClient: LanguageClient;
 export function activate(context: ExtensionContext) {
 	// Start the language servers
 	{
-		const hbServerModule = context.asAbsolutePath(path.join('server', 'out', 'hbserver.js'));
-		const hmmmServerModule = context.asAbsolutePath(path.join('server', 'out', 'hmmmserver.js'));
+		const hbServerModule = context.asAbsolutePath(join('server', 'out', 'hbserver.js'));
+		const hmmmServerModule = context.asAbsolutePath(join('server', 'out', 'hmmmserver.js'));
 
 		// Server options
 		const hbServerOptions: ServerOptions = {
@@ -89,7 +95,7 @@ export function activate(context: ExtensionContext) {
 				commands.executeCommand('workbench.action.files.save');
 				const code = readFileSync(inFile).toString().split('\n');
 				const compiledCode = compile(code);
-				if(!compiledCode) {
+				if (!compiledCode) {
 					window.showErrorMessage('HMMM file contains errors. Please fix them before building.');
 					return;
 				}

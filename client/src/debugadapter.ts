@@ -72,7 +72,7 @@ export class HMMMDebugSession extends DebugSession {
 		});
 		this._runtime.on('stopOnBreakpoint', (event: string, breakpointIds: number | number[]) => {
 			const e: DebugProtocol.StoppedEvent = new StoppedEvent(event, HMMMDebugSession.THREAD_ID);
-			e.body.hitBreakpointIds = Array.isArray(breakpointIds) ? breakpointIds : [ breakpointIds ];
+			e.body.hitBreakpointIds = Array.isArray(breakpointIds) ? breakpointIds : [breakpointIds];
 			this.sendEvent(e);
 		});
 		this._runtime.on('breakpointValidated', (bp: DebugProtocol.Breakpoint) => {
@@ -166,7 +166,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		this._source = this.createSource(program);
 
-		if(!this._runtime.configure(program, args.isBinary ? "hb" : "hmmm")) {
+		if (!this._runtime.configure(program, args.isBinary ? "hb" : "hmmm")) {
 			this.sendErrorResponse(response, 1, "Program contains errors! Please fix them before debugging.", undefined, ErrorDestination.User);
 			return;
 		}
@@ -192,11 +192,11 @@ export class HMMMDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments) : void {
+	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments): void {
 		this._variableHandles.reset();
 		this._runtime.continue(true);
 		this.sendResponse(response);
- 	}
+	}
 
 	protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): void {
 		this._variableHandles.reset();
@@ -230,7 +230,7 @@ export class HMMMDebugSession extends DebugSession {
 	protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
 		const clientLines = args.lines ?? [];
 
-		if(!this.matchesSource(args.source.path)) {
+		if (!this.matchesSource(args.source.path)) {
 			response.body = {
 				breakpoints: clientLines.map(l => <DebugProtocol.Breakpoint>{
 					verified: false,
@@ -270,7 +270,7 @@ export class HMMMDebugSession extends DebugSession {
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
 		response.body = this._runtime.getStack(args.startFrame, args.levels);
 		response.body.stackFrames.forEach(frame => {
-			if(frame.line === -1) {
+			if (frame.line === -1) {
 				frame.line = 0;
 			} else {
 				frame.source = this._source;
@@ -305,24 +305,24 @@ export class HMMMDebugSession extends DebugSession {
 		response.body = { variables: [] };
 
 		const parsedName = this.parseVariableName(this._variableHandles.get(args.variablesReference));
-		if(!parsedName) {
+		if (!parsedName) {
 			this.sendResponse(response);
 			return;
 		}
 		const [frame, name, format] = parsedName;
 
-		if(name === "registers" && args.filter !== 'indexed') {
+		if (name === "registers" && args.filter !== 'indexed') {
 			response.body.variables.push(this.getVariable("pc", frame, args.format?.hex, undefined)!);
 			response.body.variables.push(this.getVariable("ir", frame, args.format?.hex, undefined)!);
-			for(let i = 0; i < 16; i++) {
+			for (let i = 0; i < 16; i++) {
 				response.body.variables.push(this.getVariable(`r${i}`, frame, args.format?.hex, undefined)!);
 			}
-		} else if(name === "memory" && args.filter !== 'named') {
-			for(let i = 0; i < 256; i++) {
+		} else if (name === "memory" && args.filter !== 'named') {
+			for (let i = 0; i < 256; i++) {
 				response.body.variables.push(this.getVariable(`addr_${i}`, frame, args.format?.hex, undefined)!);
 			}
-		} else if(name.startsWith("addr_") || name.startsWith("r")) {
-			if(format) {
+		} else if (name.startsWith("addr_") || name.startsWith("r")) {
+			if (format) {
 				this.sendResponse(response);
 				return;
 			}
@@ -332,7 +332,7 @@ export class HMMMDebugSession extends DebugSession {
 			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "signed")!);
 			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "unsigned")!);
 			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "decompiled")!);
-			if(name.startsWith("addr_")) response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "modified")!);
+			if (name.startsWith("addr_")) response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "modified")!);
 		}
 
 		response.body.variables = sliceWithCount(response.body.variables, args.start, args.count);
@@ -341,14 +341,14 @@ export class HMMMDebugSession extends DebugSession {
 
 	protected evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): void {
 		const parsedName = this.parseVariableName(args.expression);
-		if(!parsedName) {
+		if (!parsedName) {
 			this.sendResponse(response);
 			return;
 		}
 		const [frame, name, format] = parsedName;
 
 		const result = this.getVariable(name, frame ?? args.frameId, args.format?.hex, format);
-		if(result) {
+		if (result) {
 			response.body = {
 				result: result.value,
 				type: result.type,
@@ -364,7 +364,7 @@ export class HMMMDebugSession extends DebugSession {
 
 	protected setExpressionRequest(response: DebugProtocol.SetExpressionResponse, args: DebugProtocol.SetExpressionArguments): void {
 		const parsedName = this.parseVariableName(args.expression);
-		if(!parsedName) {
+		if (!parsedName) {
 			this.sendResponse(response);
 			return;
 		}
@@ -373,7 +373,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.setVariable(name, args.value, frame ?? args.frameId, format);
 
 		const result = this.getVariable(name, frame, args.format?.hex, format);
-		if(result) {
+		if (result) {
 			response.body = {
 				value: result.value,
 				type: result.type,
@@ -389,7 +389,7 @@ export class HMMMDebugSession extends DebugSession {
 
 	protected setVariableRequest(response: DebugProtocol.SetVariableResponse, args: DebugProtocol.SetVariableArguments): void {
 		const parsedName = this.parseVariableName(args.name, args.variablesReference);
-		if(!parsedName) {
+		if (!parsedName) {
 			this.sendResponse(response);
 			return;
 		}
@@ -398,7 +398,7 @@ export class HMMMDebugSession extends DebugSession {
 		this.setVariable(name, args.value, frame, format);
 
 		const result = this.getVariable(name, frame, args.format?.hex, format);
-		if(result) {
+		if (result) {
 			response.body = {
 				value: result.value,
 				type: result.type,
@@ -417,24 +417,24 @@ export class HMMMDebugSession extends DebugSession {
 			description: "Data breakpoints can only be set on memory addresses and general purpose registers."
 		};
 
-		if(args.variablesReference) {
+		if (args.variablesReference) {
 			const container = this._variableHandles.get(args.variablesReference);
-			const [ frame, name, format ] = this.parseVariableName(container) ?? [ undefined, undefined, undefined ];
+			const [frame, name, format] = this.parseVariableName(container) ?? [undefined, undefined, undefined];
 
-			if(name && name !== "memory" && name !== "registers") {
+			if (name && name !== "memory" && name !== "registers") {
 				this.sendResponse(response);
 				return;
 			}
 		}
 
 		const parsedName = this.parseVariableName(args.name);
-		if(!parsedName) {
+		if (!parsedName) {
 			this.sendResponse(response);
 			return;
 		}
-		const [ frame, name, format ] = parsedName;
+		const [frame, name, format] = parsedName;
 
-		if(format) {
+		if (format) {
 			this.sendResponse(response);
 			return;
 		}
@@ -443,7 +443,7 @@ export class HMMMDebugSession extends DebugSession {
 			response.body = {
 				dataId: name,
 				description: name.startsWith("addr_") ? `Memory Address ${name.substring("addr_".length)}` : `Register ${name.substring(1)}`,
-				accessTypes: [ "read", "write", "readWrite" ],
+				accessTypes: ["read", "write", "readWrite"],
 				canPersist: true
 			};
 		}
@@ -458,39 +458,39 @@ export class HMMMDebugSession extends DebugSession {
 
 		response.body = {
 			breakpoints: args.breakpoints.map(bp => {
-				if(/^(r\d+|addr_\d+)$/.test(bp.dataId) && bp.dataId !== "r0") {
+				if (/^(r\d+|addr_\d+)$/.test(bp.dataId) && bp.dataId !== "r0") {
 					const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
 					const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
 
-					if(bp.dataId.startsWith("addr_")) {
+					if (bp.dataId.startsWith("addr_")) {
 						const address = parseInt(bp.dataId.substring("addr_".length));
-						if(isNaN(address) || address < 0 || address > 255) {
-							return <DebugProtocol.Breakpoint> {
+						if (isNaN(address) || address < 0 || address > 255) {
+							return <DebugProtocol.Breakpoint>{
 								verified: false,
 								message: `${address} is not a valid memory address.`
 							};
 						}
-						return <DebugProtocol.Breakpoint> {
+						return <DebugProtocol.Breakpoint>{
 							id: this._runtime.setDataBreakpoint(address, "memory", onRead, onWrite),
 							verified: true,
 							description: `Memory Address ${address}`
 						}
 					} else {
 						const register = parseInt(bp.dataId.substring(1));
-						if(isNaN(register) || register < 0 || register > 15) {
-							return <DebugProtocol.Breakpoint> {
+						if (isNaN(register) || register < 0 || register > 15) {
+							return <DebugProtocol.Breakpoint>{
 								verified: false,
 								message: `${register} is not a valid register.`
 							};
 						}
-						return <DebugProtocol.Breakpoint> {
+						return <DebugProtocol.Breakpoint>{
 							id: this._runtime.setDataBreakpoint(register, "register", onRead, onWrite),
 							verified: true,
 							description: `Register ${register}`
 						}
 					}
 				}
-				return <DebugProtocol.Breakpoint> {
+				return <DebugProtocol.Breakpoint>{
 					verified: false,
 					message: `Data breakpoints can only be set on memory addresses and general purpose registers.`
 				};
@@ -501,7 +501,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected gotoTargetsRequest(response: DebugProtocol.GotoTargetsResponse, args: DebugProtocol.GotoTargetsArguments, request?: DebugProtocol.Request | undefined): void {
-		if(!this.matchesSource(args.source.path)) {
+		if (!this.matchesSource(args.source.path)) {
 			this.sendResponse(response);
 			return;
 		}
@@ -511,7 +511,7 @@ export class HMMMDebugSession extends DebugSession {
 				this.convertClientLineToDebugger(args.line)
 			).map(l => {
 				const instructionAddress = this._runtime.getInstructionForSourceLine(l);
-				return <DebugProtocol.GotoTarget> {
+				return <DebugProtocol.GotoTarget>{
 					id: instructionAddress,
 					line: this.convertDebuggerLineToClient(l),
 					column: this.convertDebuggerColumnToClient(0),
@@ -534,7 +534,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments, request?: DebugProtocol.Request | undefined): void {
-		const [ exceptionId, description ] = this._runtime.getLastException();
+		const [exceptionId, description] = this._runtime.getLastException();
 
 		response.body = {
 			exceptionId,
@@ -551,18 +551,18 @@ export class HMMMDebugSession extends DebugSession {
 	//---- helpers
 
 	private parseVariableName(name: string, variablesReference?: number): [number | undefined, string, string | undefined] | undefined {
-		if(variablesReference && name.endsWith(" Value")) {
+		if (variablesReference && name.endsWith(" Value")) {
 			const container = this.parseVariableName(this._variableHandles.get(variablesReference, ''));
-			if(container) {
+			if (container) {
 				container[2] = name.substring(0, name.length - " Value".length).toLowerCase();
 				return container;
 			}
 		}
 
 		let frame: number | undefined = undefined;
-		if(name.startsWith("frame_")) {
+		if (name.startsWith("frame_")) {
 			const indexOfDot = name.indexOf('.');
-			if(indexOfDot >= 0) {
+			if (indexOfDot >= 0) {
 				frame = parseInt(name.substring('frame_'.length, indexOfDot));
 				name = name.substring(indexOfDot + 1);
 			} else {
@@ -573,39 +573,39 @@ export class HMMMDebugSession extends DebugSession {
 		name = indexOfDot >= 0 ? name.substring(0, indexOfDot) : name;
 		const format = indexOfDot >= 0 ? name.substring(indexOfDot + 1) : undefined;
 
-		return [ frame, name, format ];
+		return [frame, name, format];
 	}
 
 	private getVariable(name: string, stackFrame?: number, hex?: boolean, format?: string): DebugProtocol.Variable | undefined {
 		stackFrame = stackFrame ?? -1;
 		name = name.toLowerCase();
 
-		if(!isNaN(parseInt(name))) name = `addr_${name}`;
+		if (!isNaN(parseInt(name))) name = `addr_${name}`;
 
 		const frame = this._runtime.getStateAtFrame(stackFrame);
-		if(!frame) return undefined;
+		if (!frame) return undefined;
 
 		let displayName = name;
 		let value: string | number | undefined = undefined;
 		let numChildren = 0;
 		let attributes: DebugProtocol.VariablePresentationHint["attributes"] = undefined;
 
-		if(name === "pc") {
+		if (name === "pc") {
 			value = frame.instructionPointer;
-			attributes = [ "readOnly" ];
-		} else if(name === "ir") {
+			attributes = ["readOnly"];
+		} else if (name === "ir") {
 			const instruction = decompileInstruction(frame.instruction) ?? "invalid instruction";
 			value = instruction;
-			attributes = [ "readOnly" ];
-		} else if(name.startsWith('r')) {
+			attributes = ["readOnly"];
+		} else if (name.startsWith('r')) {
 			const register = parseInt(name.substring(1));
-			if(isNaN(register) || register < 0 || register > 15) return undefined;
+			if (isNaN(register) || register < 0 || register > 15) return undefined;
 			value = frame.registers[register];
-			attributes = register === 0 ? [ "constant", "readOnly" ] : undefined;
+			attributes = register === 0 ? ["constant", "readOnly"] : undefined;
 			numChildren = 5;
-		} else if(name.startsWith('addr_')) {
+		} else if (name.startsWith('addr_')) {
 			const address = parseInt(name.substring('addr_'.length));
-			if(isNaN(address) || address < 0 || address > 255) return undefined;
+			if (isNaN(address) || address < 0 || address > 255) return undefined;
 			value = frame.memory[address];
 			numChildren = 6;
 		} else {
@@ -613,29 +613,29 @@ export class HMMMDebugSession extends DebugSession {
 		}
 
 		let stringValue: string | undefined = undefined;
-		if(typeof value === "number") {
-			if(format === "hex") {
+		if (typeof value === "number") {
+			if (format === "hex") {
 				displayName = "Hex Value";
 				stringValue = HMMMDebugSession.formatValue(value, false, true);
 				numChildren = 0;
-			} else if(format === "binary") {
+			} else if (format === "binary") {
 				displayName = "Binary Value";
 				stringValue = value.toString(2).padStart(16, "0").replace(binaryRegex, "$1 $2 $3 $4");
 				numChildren = 0;
-			} else if(format === "signed") {
+			} else if (format === "signed") {
 				displayName = "Signed Value";
 				stringValue = HMMMDebugSession.formatValue(value, true, false);
 				numChildren = 0;
-			} else if(format === "unsigned") {
+			} else if (format === "unsigned") {
 				displayName = "Unsigned Value";
 				stringValue = HMMMDebugSession.formatValue(value, false, false);
 				numChildren = 0;
-			} else if(format === "decompiled") {
+			} else if (format === "decompiled") {
 				displayName = "Decompiled Instruction";
 				stringValue = decompileInstruction(value) ?? "invalid instruction";
 				attributes = HMMMDebugSession.withReadOnly(attributes);
 				numChildren = 0;
-			} else if(format === "modified") {
+			} else if (format === "modified") {
 				displayName = "Modified";
 				const address = name.startsWith("addr_") ? parseInt(name.substring("addr_".length)) : NaN;
 				stringValue = isNaN(address) ? "unknown" : frame.modifiedMemory.has(parseInt(name.substring("addr_".length))).toString();
@@ -648,10 +648,10 @@ export class HMMMDebugSession extends DebugSession {
 			stringValue = value;
 		}
 
-		if(stackFrame !== -1) attributes = HMMMDebugSession.withReadOnly(attributes);
+		if (stackFrame !== -1) attributes = HMMMDebugSession.withReadOnly(attributes);
 
 		const evaluateName = `frame_${stackFrame}.${name}${format ? `.${format}` : ""}`;
-		return <DebugProtocol.Variable> {
+		return <DebugProtocol.Variable>{
 			name: displayName,
 			value: stringValue,
 			evaluateName,
@@ -663,36 +663,36 @@ export class HMMMDebugSession extends DebugSession {
 
 	private setVariable(name: string, value: string, stackFrame?: number, format?: string): void {
 		stackFrame = stackFrame ?? -1;
-		if(stackFrame !== -1) return;
+		if (stackFrame !== -1) return;
 
 		name = name.toLowerCase();
 		value = value.toLowerCase().replace(/[_\s]/g, "");
 
-		if(!isNaN(parseInt(name))) name = `addr_${name}`;
+		if (!isNaN(parseInt(name))) name = `addr_${name}`;
 
 		let newValue: number | undefined = undefined;
 		let detectedFormat: string | undefined = undefined;
-		if(value.startsWith("0x")) {
+		if (value.startsWith("0x")) {
 			newValue = parseInt(value.substring(2), 16);
 			detectedFormat = "hex";
-		} else if(/[a-f]/.test(value)) {
+		} else if (/[a-f]/.test(value)) {
 			newValue = parseInt(value, 16);
 			detectedFormat = "hex";
-		} else if(value.startsWith("0b")) {
+		} else if (value.startsWith("0b")) {
 			newValue = parseInt(value.substring(2), 2);
 			detectedFormat = "binary";
-		} else if(value.length > 6 && /^[01]+$/.test(value)) {
+		} else if (value.length > 6 && /^[01]+$/.test(value)) {
 			newValue = parseInt(value, 2);
 			detectedFormat = "binary";
-		} else if(value.startsWith("-")) {
+		} else if (value.startsWith("-")) {
 			newValue = parseInt(value, 10);
 			detectedFormat = "signed";
 		}
 
-		if(format && detectedFormat && format !== detectedFormat) return;
+		if (format && detectedFormat && format !== detectedFormat) return;
 
-		if(format && !newValue) {
-			switch(format) {
+		if (format && !newValue) {
+			switch (format) {
 				case "hex": newValue = parseInt(value, 16); break;
 				case "binary": newValue = parseInt(value, 2); break;
 				case "signed":
@@ -700,20 +700,20 @@ export class HMMMDebugSession extends DebugSession {
 			}
 		}
 
-		if(!newValue) newValue = parseInt(value, 10);
-		if(isNaN(newValue)) return;
+		if (!newValue) newValue = parseInt(value, 10);
+		if (isNaN(newValue)) return;
 
-		if(name.startsWith('r')) {
+		if (name.startsWith('r')) {
 			const register = parseInt(name.substring(1));
-			if(isNaN(register) || register < 0 || register > 15) return;
+			if (isNaN(register) || register < 0 || register > 15) return;
 			this._runtime.setRegister(register, newValue);
-		} else if(name.startsWith('addr_')) {
+		} else if (name.startsWith('addr_')) {
 			const address = parseInt(name.substring('addr_'.length));
-			if(isNaN(address) || address < 0 || address > 255) return;
+			if (isNaN(address) || address < 0 || address > 255) return;
 			this._runtime.setMemory(address, newValue);
 		}
 
-		this.sendEvent(new InvalidatedEvent([ "variables" ], HMMMDebugSession.THREAD_ID, stackFrame));
+		this.sendEvent(new InvalidatedEvent(["variables"], HMMMDebugSession.THREAD_ID, stackFrame));
 	}
 
 	private createSource(filePath: string): Source {
@@ -725,7 +725,7 @@ export class HMMMDebugSession extends DebugSession {
 	}
 
 	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint["attributes"]): DebugProtocol.VariablePresentationHint["attributes"] {
-		return attributes ? attributes.concat("readOnly").filter(removeDuplicates) : [ "readOnly" ];
+		return attributes ? attributes.concat("readOnly").filter(removeDuplicates) : ["readOnly"];
 	}
 
 	private static formatValue(value: number, signed?: boolean, hex?: boolean): string {

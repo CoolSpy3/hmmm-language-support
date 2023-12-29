@@ -117,12 +117,12 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public setRegister(register: number, value: number) {
-		if(register < 1 /* register 0 is always 0 */ || register > 15) return;
+		if (register < 1 /* register 0 is always 0 */ || register > 15) return;
 		this._registers[register] = value & 0xFFFF;
 	}
 
 	public setMemory(address: number, value: number) {
-		if(address < 0 || address > 255) return;
+		if (address < 0 || address > 255) return;
 		this._memory[address] = value & 0xFFFF;
 		this._modifiedMemory.add(address);
 	}
@@ -168,7 +168,7 @@ export class HMMMRuntime extends EventEmitter {
 
 		const stack = sliceWithCount(this._stack, sliceStart, startFrame === 0 ? levels - 1 : levels).map((frame, idx) => {
 			const decompiledInstruction = decompileInstruction(frame.instruction);
-			return <StackFrame> {
+			return <StackFrame>{
 				id: sliceStart + idx,
 				name: decompiledInstruction ? `${frame.instructionPointer} ${decompiledInstruction}` : "Invalid Instruction",
 				line: this._instructionToSourceMap.get(frame.instructionPointer) ?? -1,
@@ -178,8 +178,8 @@ export class HMMMRuntime extends EventEmitter {
 			};
 		});
 
-		if(startFrame === 0) {
-			const currentInstruction = <StackFrame> {
+		if (startFrame === 0) {
+			const currentInstruction = <StackFrame>{
 				id: -1,
 				name: this.getInstruction(this._instructionPointer),
 				line: this._instructionToSourceMap.get(this._instructionPointer) ?? -1,
@@ -195,12 +195,12 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public restartFrame(frameId: number) {
-		if(frameId === -1) {
+		if (frameId === -1) {
 			this.sendEvent('stop', 'restart');
 			return;
 		}
 		const frame = this._stack[frameId];
-		if(!frame) {
+		if (!frame) {
 			this.sendEvent('stop', 'restart');
 			return;
 		}
@@ -210,8 +210,8 @@ export class HMMMRuntime extends EventEmitter {
 		this._memory = [...frame.memory];
 		this._modifiedMemory = new Set(frame.modifiedMemory);
 		this._stack = this._stack.slice(0, frameId);
-		if(frame.lastExecutedInstructionId) {
-			while(this._instructionLog.length > 0 && this._instructionLog[0].id !== frame.lastExecutedInstructionId) {
+		if (frame.lastExecutedInstructionId) {
+			while (this._instructionLog.length > 0 && this._instructionLog[0].id !== frame.lastExecutedInstructionId) {
 				this._instructionLog.shift();
 			}
 		} else {
@@ -242,13 +242,13 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public getStateAtFrame(idx: number): HMMMState | undefined {
-		if(idx === -1) return this.getCurrentState();
-		if(idx < 0 || idx >= this._stack.length) return undefined;
+		if (idx === -1) return this.getCurrentState();
+		if (idx < 0 || idx >= this._stack.length) return undefined;
 		return this._stack[idx];
 	}
 
 	public getInstruction(address: number): string {
-		if(address < 0 || address > 255) return "Invalid Instruction Pointer";
+		if (address < 0 || address > 255) return "Invalid Instruction Pointer";
 		const instruction = decompileInstruction(this._memory[address]);
 		return instruction ? `${address} ${instruction}` : "Invalid Instruction";
 	}
@@ -262,10 +262,10 @@ export class HMMMRuntime extends EventEmitter {
 		for (let line = startLine; line <= endLine; line++) {
 			const lineText = this._sourceLines[line];
 
-			if(this._language === "hb") {
-				if(binaryRegex.test(lineText)) validLines.push(line);
+			if (this._language === "hb") {
+				if (binaryRegex.test(lineText)) validLines.push(line);
 			} else {
-				if(preprocessLine(lineText).trim()) validLines.push(line);
+				if (preprocessLine(lineText).trim()) validLines.push(line);
 			}
 		}
 
@@ -275,10 +275,10 @@ export class HMMMRuntime extends EventEmitter {
 	/*
 	 * Set breakpoint in file with given line.
 	 */
-	public setBreakpoint(line: number) : DebugProtocol.Breakpoint {
+	public setBreakpoint(line: number): DebugProtocol.Breakpoint {
 		const bp: DebugProtocol.Breakpoint = { id: this._breakpointId++, verified: false };
 
-		if(this._sourceToInstructionMap.has(line)) {
+		if (this._sourceToInstructionMap.has(line)) {
 			bp.verified = true;
 			this._instructionBreakpoints.set(this._sourceToInstructionMap.get(line)!, bp.id!);
 		}
@@ -290,7 +290,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * Remove the breakpoint on the given line
 	 */
 	public clearBreakpoint(line: number): void {
-		if(this._sourceToInstructionMap.has(line)) this._instructionBreakpoints.delete(this._sourceToInstructionMap.get(line)!);
+		if (this._sourceToInstructionMap.has(line)) this._instructionBreakpoints.delete(this._sourceToInstructionMap.get(line)!);
 	}
 
 	/*
@@ -305,18 +305,18 @@ export class HMMMRuntime extends EventEmitter {
 	 */
 	public setDataBreakpoint(address: number, type: "register" | "memory", onRead: boolean, onWrite: boolean): number {
 		const id = this._breakpointId++;
-		if(type === "register") {
-			if(onRead) {
+		if (type === "register") {
+			if (onRead) {
 				this._registerReadBreakpoints.set(address, id);
 			}
-			if(onWrite) {
+			if (onWrite) {
 				this._registerWriteBreakpoints.set(address, id);
 			}
 		} else {
-			if(onRead) {
+			if (onRead) {
 				this._memoryReadBreakpoints.set(address, id);
 			}
-			if(onWrite) {
+			if (onWrite) {
 				this._memoryWriteBreakpoints.set(address, id);
 			}
 		}
@@ -334,7 +334,7 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	public setExceptionBreakpoints(enabledExceptions: Array<string>): DebugProtocol.Breakpoint[] {
-		const breakpoints = enabledExceptions.map((exception) => <DebugProtocol.Breakpoint> {
+		const breakpoints = enabledExceptions.map((exception) => <DebugProtocol.Breakpoint>{
 			id: this._breakpointId++,
 			verified: true
 		});
@@ -353,7 +353,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * @returns The converted number.
 	 */
 	public static s16IntToNumber(n: number): number {
-		if(n > 32767) return n - 65536;
+		if (n > 32767) return n - 65536;
 		return n;
 	}
 
@@ -365,19 +365,19 @@ export class HMMMRuntime extends EventEmitter {
 		const binaryInstruction = this._memory[address];
 		const instruction = parseBinaryInstruction(binaryInstruction);
 
-		if(!instruction) return undefined;
+		if (!instruction) return undefined;
 
 		let rX: number | undefined = undefined;
 		let rY: number | undefined = undefined;
 		let rZ: number | undefined = undefined;
 		let N: number | undefined = undefined;
 
-		if(instruction.instruction.operand1 === HMMMOperandType.REGISTER) rX = instruction.operands[0].value;
-		if(instruction.instruction.operand2 === HMMMOperandType.REGISTER) rY = instruction.operands[1].value;
-		if(instruction.instruction.operand3 === HMMMOperandType.REGISTER) rZ = instruction.operands[2].value;
+		if (instruction.instruction.operand1 === HMMMOperandType.REGISTER) rX = instruction.operands[0].value;
+		if (instruction.instruction.operand2 === HMMMOperandType.REGISTER) rY = instruction.operands[1].value;
+		if (instruction.instruction.operand3 === HMMMOperandType.REGISTER) rZ = instruction.operands[2].value;
 
-		if(instruction.instruction.operand1 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand1 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[0].value;
-		if(instruction.instruction.operand2 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand2 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[1].value;
+		if (instruction.instruction.operand1 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand1 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[0].value;
+		if (instruction.instruction.operand2 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand2 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[1].value;
 
 		return [binaryInstruction, instruction, rX, rY, rZ, N];
 	}
@@ -386,11 +386,11 @@ export class HMMMRuntime extends EventEmitter {
 
 	private determineAccesses(): StateAccess[] {
 		const parsedInstruction = this.getCurrentInstruction();
-		if(!parsedInstruction) return [];
+		if (!parsedInstruction) return [];
 		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
 		const accesses: StateAccess[] = [];
-		switch(instruction.instruction.name) {
+		switch (instruction.instruction.name) {
 			case "halt":
 			case "nop":
 			case "jumpn":
@@ -445,7 +445,7 @@ export class HMMMRuntime extends EventEmitter {
 				break;
 			case "popr":
 				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: this._registers[rY!]-1, dataType: "memory", accessType: "read" });
+				accesses.push({ address: this._registers[rY!] - 1, dataType: "memory", accessType: "read" });
 				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
 				accesses.push({ address: rY!, dataType: "register", accessType: "write" });
 				break;
@@ -463,52 +463,52 @@ export class HMMMRuntime extends EventEmitter {
 	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false): boolean {
 		if (!accesses) accesses = this.determineAccesses();
 
-		if(!ignoreNonCritical && this._ignoreBreakpoints) {
+		if (!ignoreNonCritical && this._ignoreBreakpoints) {
 			ignoreNonCritical = true;
 			this._ignoreBreakpoints = false;
 			this._ignoredExceptions = [];
 		}
 
 		let hitBreakpoints: number[] = [];
-		for(const access of accesses) {
-			if(access.dataType === "register") {
-				if(ignoreNonCritical) continue;
+		for (const access of accesses) {
+			if (access.dataType === "register") {
+				if (ignoreNonCritical) continue;
 
-				if(access.accessType === "read" && this._registerReadBreakpoints.has(access.address)) {
+				if (access.accessType === "read" && this._registerReadBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._registerReadBreakpoints.get(access.address)!);
 				}
-				if(access.accessType === "write" && this._registerWriteBreakpoints.has(access.address)) {
+				if (access.accessType === "write" && this._registerWriteBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._registerWriteBreakpoints.get(access.address)!);
 				}
 			} else {
-				if(access.address < 0 || access.address > 255) {
+				if (access.address < 0 || access.address > 255) {
 					const message = `Instruction at ${this._instructionPointer} attempted to access invalid memory address ${access.address}`;
 					this.onException("invalid-memory-access", message, true);
 					return true;
 				}
 
-				if(ignoreNonCritical) continue;
+				if (ignoreNonCritical) continue;
 
-				if(access.address < this._numInstructions) {
-					if(access.accessType === "read") {
+				if (access.address < this._numInstructions) {
+					if (access.accessType === "read") {
 						const message = `Instruction at ${this._instructionPointer} attempted to read from the code segment at address ${access.address}`;
-						if(this.onException("cs-read", message, false)) return true;
-					} else if(access.accessType === "write") {
+						if (this.onException("cs-read", message, false)) return true;
+					} else if (access.accessType === "write") {
 						const message = `Instruction at ${this._instructionPointer} attempted to write to the code segment at address ${access.address}`;
-						if(this.onException("cs-write", message, false)) return true;
+						if (this.onException("cs-write", message, false)) return true;
 					}
 				}
 
-				if(access.accessType === "read" && this._memoryReadBreakpoints.has(access.address)) {
+				if (access.accessType === "read" && this._memoryReadBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._memoryReadBreakpoints.get(access.address)!);
 				}
-				if(access.accessType === "write" && this._memoryWriteBreakpoints.has(access.address)) {
+				if (access.accessType === "write" && this._memoryWriteBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._memoryWriteBreakpoints.get(access.address)!);
 				}
 			}
 		}
 
-		if(hitBreakpoints.length > 0) {
+		if (hitBreakpoints.length > 0) {
 			this.sendEvent('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
 			return true;
 		}
@@ -517,13 +517,13 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private checkInstructionExecutionAccess(): boolean {
-		if(this._instructionPointer < 0 || this._instructionPointer >= this._numInstructions) {
-			if(this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment`, false)) {
+		if (this._instructionPointer < 0 || this._instructionPointer >= this._numInstructions) {
+			if (this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment`, false)) {
 				return true;
 			}
 		}
 
-		if(this.checkAccesses([{ accessType: "read", address: this._instructionPointer, dataType: "memory" }], true)) {
+		if (this.checkAccesses([{ accessType: "read", address: this._instructionPointer, dataType: "memory" }], true)) {
 			return true;
 		}
 
@@ -534,24 +534,24 @@ export class HMMMRuntime extends EventEmitter {
 		this._sourceLines = readFileSync(file).toString().split('\n');
 
 		let code = this._sourceLines;
-		if(this._language === "hmmm") {
+		if (this._language === "hmmm") {
 			const compiledCode = compile(code);
 
-			if(!compiledCode) return false;
+			if (!compiledCode) return false;
 
 			[code, this._instructionToSourceMap] = compiledCode;
 
-			for(const [instructionLine, sourceLine] of this._instructionToSourceMap) {
+			for (const [instructionLine, sourceLine] of this._instructionToSourceMap) {
 				this._sourceToInstructionMap.set(sourceLine, instructionLine);
 			}
 		}
 
-		for(let i = 0; i < code.length; i++) {
+		for (let i = 0; i < code.length; i++) {
 			const line = code[i];
 
-			if(!line.trim()) continue; // Skip empty lines
+			if (!line.trim()) continue; // Skip empty lines
 
-			if(this._language === "hb") {
+			if (this._language === "hb") {
 				this._instructionToSourceMap.set(this._numInstructions, i);
 				this._sourceToInstructionMap.set(i, this._numInstructions);
 			}
@@ -560,7 +560,7 @@ export class HMMMRuntime extends EventEmitter {
 
 			const encodedInstruction = parseInt(line.replaceAll(/\s/g, ''), 2);
 
-			if(isNaN(encodedInstruction)) return false;
+			if (isNaN(encodedInstruction)) return false;
 
 			this._memory[i] = encodedInstruction;
 		}
@@ -576,7 +576,7 @@ export class HMMMRuntime extends EventEmitter {
 		this._pause = false;
 
 		if (reverse) {
-			if(!this._instructionLogEnabled) {
+			if (!this._instructionLogEnabled) {
 				window.showErrorMessage(`Reverse Execution is not enabled`);
 				this.sendEvent('end');
 				return;
@@ -589,32 +589,32 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private async executeInstruction(stepInstruction?: string) {
-		if(this._pause) {
+		if (this._pause) {
 			this.sendEvent('stop', 'pause');
 			return;
 		}
 
-		if(this._instructionPointer >= this._numInstructions) {
+		if (this._instructionPointer >= this._numInstructions) {
 			const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
 			this.onException("execute-outside-cs", message, false);
 			return;
 		}
 
-		if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+		if (this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
 			this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
 			return;
 		}
 
-		if(this.checkInstructionExecutionAccess()) return;
+		if (this.checkInstructionExecutionAccess()) return;
 
 		const parsedInstruction = this.getCurrentInstruction();
 
-		if(!parsedInstruction) {
+		if (!parsedInstruction) {
 			this.onInvalidInstruction();
 			return;
 		}
 
-		if(this.checkAccesses()) return;
+		if (this.checkAccesses()) return;
 
 		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
@@ -622,18 +622,18 @@ export class HMMMRuntime extends EventEmitter {
 		let oldData: number | undefined = undefined;
 		let nextInstructionPointer: number | undefined = undefined;
 
-		switch(instruction.instruction.name) {
+		switch (instruction.instruction.name) {
 			case "halt":
 				this.sendEvent('end');
 				return;
 			case "read":
 				oldData = this._registers[rX!];
-				const input = parseInt(await window.showInputBox(<InputBoxOptions> {
+				const input = parseInt(await window.showInputBox(<InputBoxOptions>{
 					placeHolder: `Enter a number to store into r${rX}`,
 					prompt: `You can also type any non-numerical text to terminate the program.`,
 					title: `HMMM: ${this._instructionPointer} ${decompileInstruction(instruction)}`
 				}) ?? '');
-				if(isNaN(input)) {
+				if (isNaN(input)) {
 					this.sendEvent('end');
 					return;
 				}
@@ -721,25 +721,25 @@ export class HMMMRuntime extends EventEmitter {
 				createStackFrame = true;
 				break;
 			case "jeqzn":
-				if(this._registers[rX!] === 0) {
+				if (this._registers[rX!] === 0) {
 					nextInstructionPointer = N!;
 					createStackFrame = true;
 				}
 				break;
 			case "jnezn":
-				if(this._registers[rX!] !== 0) {
+				if (this._registers[rX!] !== 0) {
 					nextInstructionPointer = N!;
 					createStackFrame = true;
 				}
 				break;
 			case "jgtzn":
-				if(this._registers[rX!] > 0) {
+				if (this._registers[rX!] > 0) {
 					nextInstructionPointer = N!;
 					createStackFrame = true;
 				}
 				break;
 			case "jltzn":
-				if(this._registers[rX!] < 0) {
+				if (this._registers[rX!] < 0) {
 					nextInstructionPointer = N!;
 					createStackFrame = true;
 				}
@@ -749,17 +749,17 @@ export class HMMMRuntime extends EventEmitter {
 				return;
 		}
 
-		if(createStackFrame) {
+		if (createStackFrame) {
 			this.createStackFrame();
 		}
 		this.updateInstructionLog(createStackFrame, oldData);
-		if(nextInstructionPointer !== undefined) {
+		if (nextInstructionPointer !== undefined) {
 			this._instructionPointer = nextInstructionPointer;
 		} else {
 			this._instructionPointer++;
 		}
 
-		if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
+		if (stepInstruction === '' || instruction.instruction.name === stepInstruction) {
 			this.sendEvent('stop', 'step');
 			return;
 		}
@@ -773,15 +773,15 @@ export class HMMMRuntime extends EventEmitter {
 
 		const parsedInstruction = this.getCurrentInstruction();
 
-		if(!parsedInstruction) {
+		if (!parsedInstruction) {
 			this.onInvalidInstruction();
 			return;
 		}
 
 		const [_binaryInstruction, instruction, rX, rY, _rZ, N] = this.getCurrentInstruction()!;
 
-		if(instructionInfo.didCreateStackFrame) {
-			if(this._stack.length === 0) {
+		if (instructionInfo.didCreateStackFrame) {
+			if (this._stack.length === 0) {
 				this.debuggerOutput('WARNING: Stack Underflow');
 			} else {
 				this._stack.shift();
@@ -789,8 +789,8 @@ export class HMMMRuntime extends EventEmitter {
 		}
 
 		const oldData = instructionInfo.oldData;
-		if(oldData !== undefined) {
-			switch(instruction.instruction.name) {
+		if (oldData !== undefined) {
+			switch (instruction.instruction.name) {
 				case "halt":
 					this.sendEvent('end');
 					return;
@@ -844,19 +844,19 @@ export class HMMMRuntime extends EventEmitter {
 			}
 		}
 
-		if(this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
+		if (this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
 			this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
 			return;
 		}
 
-		if(this.checkAccesses()) return;
+		if (this.checkAccesses()) return;
 
-		if(stepInstruction === '' || instruction.instruction.name === stepInstruction) {
+		if (stepInstruction === '' || instruction.instruction.name === stepInstruction) {
 			this.sendEvent('stop', 'step');
 			return;
 		}
 
-		if(this._pause) {
+		if (this._pause) {
 			this.sendEvent('stop', 'pause');
 			return;
 		}
@@ -865,10 +865,10 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private createStackFrame() {
-		if(!this._stackEnabled) return;
-		if(this._stack.length >= this._maxStackDepth) {
+		if (!this._stackEnabled) return;
+		if (this._stack.length >= this._maxStackDepth) {
 			this._stack.pop();
-			if(!this._hasSentStackDepthWarning) {
+			if (!this._hasSentStackDepthWarning) {
 				this._hasSentStackDepthWarning = true;
 				this.debuggerOutput('WARNING: Stack Overflow');
 			}
@@ -877,10 +877,10 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private updateInstructionLog(didCreateStackFrame: boolean, oldData?: number) {
-		if(!this._instructionLogEnabled) return;
-		if(this._instructionLog.length >= this._maxInstructionLogLength) {
+		if (!this._instructionLogEnabled) return;
+		if (this._instructionLog.length >= this._maxInstructionLogLength) {
 			this._instructionLog.pop();
-			if(!this._hasSentInstructionLogLengthWarning) {
+			if (!this._hasSentInstructionLogLengthWarning) {
 				this._hasSentInstructionLogLengthWarning = true;
 				this.debuggerOutput('WARNING: Instruction Log Overflow');
 			}
@@ -899,9 +899,9 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private onException(exception: string, description: string, isCritical: boolean): boolean {
-		if(this._enabledExceptions.has(exception)) {
-			if(!this._ignoredExceptions.includes(exception) || isCritical) { // Critical exceptions should never be added to the hit breakpoints list, but just in case...
-				if(!isCritical) this._ignoredExceptions.push(exception);
+		if (this._enabledExceptions.has(exception)) {
+			if (!this._ignoredExceptions.includes(exception) || isCritical) { // Critical exceptions should never be added to the hit breakpoints list, but just in case...
+				if (!isCritical) this._ignoredExceptions.push(exception);
 				this._exception = exception;
 				this._exceptionDescription = description;
 				this.sendEvent('stopOnBreakpoint', 'exception', this._enabledExceptions.get(exception)!);
@@ -909,7 +909,7 @@ export class HMMMRuntime extends EventEmitter {
 			}
 			return false;
 		}
-		if(!isCritical) return false;
+		if (!isCritical) return false;
 		this.instructionOutput('stderr', description);
 		this.sendEvent('end');
 		return true;
@@ -924,8 +924,8 @@ export class HMMMRuntime extends EventEmitter {
 		this.sendEvent('output', message, 'console', undefined);
 	}
 
-	private sendEvent(event: string, ... args: any[]) {
-		if(event === 'stopOnBreakpoint' || (args.length > 0 && args[0] === 'step'))  {
+	private sendEvent(event: string, ...args: any[]) {
+		if (event === 'stopOnBreakpoint' || (args.length > 0 && args[0] === 'step')) {
 			this._ignoreBreakpoints = true;
 		}
 		setImmediate(_ => {

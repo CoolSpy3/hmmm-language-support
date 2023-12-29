@@ -61,7 +61,7 @@ export function applyTrailingNewlineEdits(params: DocumentFormattingParams, docu
 
         if (params.options.insertFinalNewline && numTrailingNewLines === 0) {
             // Add a newline to the end of the document if it doesn't already have one
-           return TextEdit.insert(document.positionAt(document.getText().length), '\n');
+            return TextEdit.insert(document.positionAt(document.getText().length), '\n');
         } else if (params.options.trimFinalNewlines && numTrailingNewLines > 1) {
             // Remove any newlines at the end of the document
             return TextEdit.del(Range.create(document.lineCount - numTrailingNewLines, uinteger.MIN_VALUE, document.lineCount, uinteger.MIN_VALUE));
@@ -101,7 +101,7 @@ export function populateInstructions(completionList: CompletionList) {
 export function getExpectedInstructionNumber(lineNumber: number, document: TextDocument): number {
     let numCodeLines = 0; // Keep track of the number of lines that contain code so we can check the instruction numbers
 
-    for(let i = 0; i < lineNumber; i++) { // Loop through all the lines before the given line
+    for (let i = 0; i < lineNumber; i++) { // Loop through all the lines before the given line
         // Get the line and remove any comments
         const line = preprocessDocumentLine(document, i);
 
@@ -123,7 +123,7 @@ export function getExpectedInstructionNumber(lineNumber: number, document: TextD
 export function populateLineNumber(completionList: CompletionList, lineNumber: number, document: TextDocument) {
     completionList.items.push({
         label: getExpectedInstructionNumber(lineNumber, document).toString(),
-        labelDetails: { description: 'Next Line Number'},
+        labelDetails: { description: 'Next Line Number' },
         kind: CompletionItemKind.Snippet
     });
 }
@@ -136,30 +136,30 @@ export function populateLineNumber(completionList: CompletionList, lineNumber: n
 export function populateRegisters(completionList: CompletionList) {
     completionList.items.push({
         label: `r0`,
-        labelDetails: { description: 'Always 0'},
+        labelDetails: { description: 'Always 0' },
         kind: CompletionItemKind.Variable
     });
     for (let i = 1; i < 13; i++) { // r1-r12 (r0 and r13-r15 are special registers)
         completionList.items.push({
             label: `r${i}`,
-            labelDetails: { description: 'General Purpose Register'},
+            labelDetails: { description: 'General Purpose Register' },
             kind: CompletionItemKind.Variable,
             sortText: `r${i.toString().padStart(2, '0')}`, // Make sure r10+ come after r9
         });
     }
     completionList.items.push({
         label: `r13`,
-        labelDetails: { description: 'Return Value'},
+        labelDetails: { description: 'Return Value' },
         kind: CompletionItemKind.Variable
     });
     completionList.items.push({
         label: `r14`,
-        labelDetails: { description: 'Return Address'},
+        labelDetails: { description: 'Return Address' },
         kind: CompletionItemKind.Variable
     });
     completionList.items.push({
         label: `r15`,
-        labelDetails: { description: 'Stack Pointer'},
+        labelDetails: { description: 'Stack Pointer' },
         kind: CompletionItemKind.Variable
     });
 }

@@ -449,7 +449,7 @@ connection.onCompletion(
             // The cursor is in the line number, so suggest the next line number
             populateLineNumber(completionList, params.position.line, document);
 
-            if(isNaN(parseInt(m[InstructionPart.LINE_NUM]))) populateInstructions(completionList); // The line number is invalid, so suggest an instruction
+            if (isNaN(parseInt(m[InstructionPart.LINE_NUM]))) populateInstructions(completionList); // The line number is invalid, so suggest an instruction
 
             return completionList;
         }
@@ -652,7 +652,7 @@ connection.onDocumentFormatting(
         }
 
         const trailingNewlineEdit = applyTrailingNewlineEdits(params, document);
-        if(trailingNewlineEdit) edits.push(trailingNewlineEdit);
+        if (trailingNewlineEdit) edits.push(trailingNewlineEdit);
 
         return edits;
     }
