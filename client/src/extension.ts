@@ -1,7 +1,7 @@
 // Language client sample modified from https://github.com/microsoft/vscode-extension-samples/blob/main/lsp-sample/client/src/extension.ts
 
 import * as path from 'path';
-import { ExtensionContext, TextEditor, commands, debug, window } from 'vscode';
+import { DebugConfigurationProviderTriggerKind, ExtensionContext, TextEditor, commands, debug, window } from 'vscode';
 
 import { readFileSync, writeFileSync } from 'fs';
 import {
@@ -70,8 +70,7 @@ export function activate(context: ExtensionContext) {
 		context.subscriptions.push(debug.registerDebugAdapterDescriptorFactory('hmmm', new HMMMDebugAdapterFactory()));
 
 		// Register the debug configuration provider
-		context.subscriptions.push(debug.registerDebugConfigurationProvider('hb', new HMMMDebugConfigurationProvider(true)));
-		context.subscriptions.push(debug.registerDebugConfigurationProvider('hmmm', new HMMMDebugConfigurationProvider(false)));
+		context.subscriptions.push(debug.registerDebugConfigurationProvider('hmmm', new HMMMDebugConfigurationProvider(), DebugConfigurationProviderTriggerKind.Dynamic));
 	}
 
 	// Register the commands

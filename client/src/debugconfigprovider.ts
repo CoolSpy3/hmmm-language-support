@@ -1,17 +1,21 @@
 import { DebugConfiguration, DebugConfigurationProvider, ProviderResult } from "vscode";
 
 export class HMMMDebugConfigurationProvider implements DebugConfigurationProvider {
-
-	constructor(private readonly isBinary: boolean) { }
-
 	provideDebugConfigurations(): ProviderResult<DebugConfiguration[]> {
 		return [
 			{
-				name: `Debug HMMM${this.isBinary ? ' (Binary)' : ''}`,
+				name: 'Debug HMMM',
 				type: 'hmmm',
 				request: 'launch',
 				program: '${file}',
-				isBinary: this.isBinary
+				isBinary: false
+			},
+			{
+				name: 'Debug HMMM (Binary)',
+				type: 'hmmm',
+				request: 'launch',
+				program: '${file}',
+				isBinary: true
 			}
 		];
 	}
