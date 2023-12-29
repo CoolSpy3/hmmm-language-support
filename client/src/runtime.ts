@@ -100,11 +100,13 @@ export class HMMMRuntime extends EventEmitter {
 	private _stack = new Array<HMMMState>();
 	private _stackEnabled = false;
 	private _maxStackDepth: number = 0;
+	private _hasSentStackDepthWarning = false;
 
 	private _instructionId = 1;
 	private _instructionLog = new Array<ExecutedInstruction>();
 	private _instructionLogEnabled = false;
 	private _maxInstructionLogLength: number = 0;
+	private _hasSentInstructionLogLengthWarning = false;
 
 	private _pause = false;
 	public get paused() {
@@ -865,8 +867,11 @@ export class HMMMRuntime extends EventEmitter {
 	private createStackFrame() {
 		if(!this._stackEnabled) return;
 		if(this._stack.length >= this._maxStackDepth) {
-			this.debuggerOutput('WARNING: Stack Overflow');
 			this._stack.pop();
+			if(!this._hasSentStackDepthWarning) {
+				this._hasSentStackDepthWarning = true;
+				this.debuggerOutput('WARNING: Stack Overflow');
+			}
 		}
 		this._stack.splice(0, 0, this.getCurrentState());
 	}
@@ -874,8 +879,11 @@ export class HMMMRuntime extends EventEmitter {
 	private updateInstructionLog(didCreateStackFrame: boolean, oldData?: number) {
 		if(!this._instructionLogEnabled) return;
 		if(this._instructionLog.length >= this._maxInstructionLogLength) {
-			this.debuggerOutput('WARNING: Instruction Log Overflow');
 			this._instructionLog.pop();
+			if(!this._hasSentInstructionLogLengthWarning) {
+				this._hasSentInstructionLogLengthWarning = true;
+				this.debuggerOutput('WARNING: Instruction Log Overflow');
+			}
 		}
 		this._instructionLog.splice(0, 0, {
 			id: this._instructionId++,
