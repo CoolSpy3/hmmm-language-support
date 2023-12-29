@@ -264,13 +264,7 @@ export class HMMMRuntime extends EventEmitter {
 		}
 	}
 
-	private async executeInstruction(stepInstruction?: string) {
-		if (this._instructionPointer >= this._numInstructions) {
-			const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
-			this.onException("execute-outside-cs", message, false);
-			return;
-		}
-
+	private async executeInstruction(stepInstruction?: string) {		// If there is a breakpoint on the current instruction (and it's not been ignored), pause execution
 		if (this._instructionBreakpoints.has(this._instructionPointer) && !this._ignoreBreakpoints) {
 			this.sendEvent('stopOnBreakpoint', 'breakpoint', this._instructionBreakpoints.get(this._instructionPointer)!);
 			return;
@@ -859,19 +853,13 @@ export class HMMMRuntime extends EventEmitter {
 		return accesses;
 	}
 
-	private checkAccesses(accesses?: StateAccess[], ignoreNonCritical = false): boolean {
+	private checkAccesses(accesses?: StateAccess[]): boolean {
 		if (!accesses) accesses = this.determineAccesses();
-
-		if (!ignoreNonCritical && this._ignoreBreakpoints) {
-			ignoreNonCritical = true;
-			this._ignoreBreakpoints = false;
-			this._ignoredExceptions = [];
-		}
 
 		let hitBreakpoints: number[] = [];
 		for (const access of accesses) {
 			if (access.dataType === "register") {
-				if (ignoreNonCritical) continue;
+				if (this._ignoreBreakpoints) continue;
 
 				if (access.accessType === "read" && this._registerReadBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._registerReadBreakpoints.get(access.address)!);
@@ -886,7 +874,7 @@ export class HMMMRuntime extends EventEmitter {
 					return true;
 				}
 
-				if (ignoreNonCritical) continue;
+				if (this._ignoreBreakpoints) continue;
 
 				if (access.address < this._numInstructions) {
 					if (access.accessType === "read") {
@@ -907,7 +895,10 @@ export class HMMMRuntime extends EventEmitter {
 			}
 		}
 
-		if (hitBreakpoints.length > 0) {
+		if (this._ignoreBreakpoints) {
+			this._ignoreBreakpoints = false;
+			this._ignoredExceptions = [];
+		} else if (hitBreakpoints.length > 0) {
 			this.sendEvent('stopOnBreakpoint', 'data breakpoint', hitBreakpoints);
 			return true;
 		}
@@ -916,13 +907,16 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	private checkInstructionExecutionAccess(): boolean {
-		if (this._instructionPointer < 0 || this._instructionPointer >= this._numInstructions) {
-			if (this.onException("invalid-instruction-pointer", `Attempted to execute code at address ${this._instructionPointer} is outside of the code segment`, false)) {
+		if (this._instructionPointer >= this._numInstructions) {
+			const message = `Attempted to execute an instruction outside of the code segment at address ${this._instructionPointer}`;
+			if (this.onException("execute-outside-cs", message, false)) {
 				return true;
 			}
 		}
 
-		if (this.checkAccesses([{ accessType: "read", address: this._instructionPointer, dataType: "memory" }], true)) {
+		if (this._instructionPointer < 0 || this._instructionPointer > 255) {
+			const message = `Instruction at ${this._instructionPointer} attempted to access invalid memory address ${this._instructionPointer}`;
+			this.onException("invalid-memory-access", message, true);
 			return true;
 		}
 
