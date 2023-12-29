@@ -452,11 +452,7 @@ export class HMMMRuntime extends EventEmitter {
 		const [_binaryInstruction, instruction, rX, rY, _rZ, N] = this.getCurrentInstruction()!;
 
 		if (instructionInfo.didCreateStackFrame) {
-			if (this._stack.length === 0) {
-				this.debuggerOutput('WARNING: Stack Underflow');
-			} else {
-				this._stack.shift();
-			}
+			this._stack.shift();
 		}
 
 		const oldData = instructionInfo.oldData;
