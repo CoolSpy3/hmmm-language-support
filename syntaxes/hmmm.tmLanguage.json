@@ -46,7 +46,7 @@
 					"match": "\\br0\\b"
 				},
 				{
-					"name": "support.function.hmmm",
+					"name": "support.variable.hmmm",
 					"match": "\\br1[3-5]\\b"
 				},
 				{

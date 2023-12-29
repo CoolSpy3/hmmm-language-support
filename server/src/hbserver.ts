@@ -142,9 +142,9 @@ connection.languages.semanticTokens.on(
              * @returns The token type and modifiers for the register
              */
             function getRegisterTokenType(register: number): [TokenTypes, TokenModifiers] {
-                switch(register) { // This mostly works, but I think there are still some problems with TokenModifiers that I haven't been able to figure out yet
+                switch(register) {
                     case 0:
-                        return [TokenTypes.number, (1 << TokenModifiers.readonly) | (1 << TokenModifiers.defaultLibrary)];
+                        return [TokenTypes.variable, (1 << TokenModifiers.readonly) | (1 << TokenModifiers.defaultLibrary)];
                     case 13:
                     case 14:
                     case 15:
