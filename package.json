@@ -75,7 +75,7 @@
         },
         "hmmm.debugging.reverseExecutionDepth": {
           "type": "number",
-          "default": 500000,
+          "default": 2000000,
           "description": "The maximum number of instructions that can be executed when reverse stepping"
         },
         "hmmm.debugging.enableStackFrames": {
