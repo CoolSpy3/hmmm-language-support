@@ -46,9 +46,15 @@ import {
 
 //#region Language Server Setup
 
+// Create a connection for the server
 const connection = createConnection(ProposedFeatures.all)
+
+// Create a document manager to listen for changes to text documents and keep track of their source
+// The client will send various document sync events. This object listens for those events and updates
+// document objects so we can read them later
 let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument)
 
+// When the client connects, tell it what we can do
 connection.onInitialize((params: InitializeParams) => {
     return {
         // Tell the client what we can do
@@ -432,15 +438,13 @@ connection.onCompletion(
         const completionList = CompletionList.create();
 
         if (!document) {
-            // We can't read the document, so just return the default completion list
+            // We can't read the document, so just suggest an instruction or register
             populateRegisters(completionList);
             populateInstructions(completionList);
             return completionList;
         }
 
         const line = preprocessDocumentLine(document, params.position.line);
-
-        let m: RegExpMatchArray | null;
 
         if (!line.trim()) {
             // The line is empty, so suggest the next line number or an instruction
@@ -449,6 +453,8 @@ connection.onCompletion(
             return completionList;
         }
 
+        // Try to parse the line as an instruction
+        let m: RegExpMatchArray | null;
         if (!(m = instructionRegex.exec(line))?.indices || !m.indices) {
             // The line is invalid, so suggest an instruction
             populateInstructions(completionList);
@@ -499,6 +505,7 @@ connection.onCompletion(
             return completionList;
         }
 
+        // Couldn't find anything to suggest, so just return an empty list
         return completionList;
     }
 );
@@ -509,6 +516,7 @@ connection.onDefinition(
             If the user tries to go to the definition of a line number in a jump or call instruction, return all lines with a matching line number
         */
 
+        // Get the document
         const document = documents.get(params.textDocument.uri);
 
         if (!document) return []; // We can't read the document, so just return an empty array
@@ -590,6 +598,7 @@ connection.onDocumentFormatting(
             let m: RegExpMatchArray | null;
             if (!(m = instructionRegex.exec(line))) continue; // The line is not an instruction, so skip it
 
+            // Convert the line number to an int and back to get the shortest string representation
             let lineNumNum = strictParseInt(m[InstructionPart.LINE_NUM]);
 
             if (isNaN(lineNumNum)) {
@@ -634,6 +643,7 @@ connection.onDocumentFormatting(
             let m: RegExpMatchArray | null;
             if (!(m = instructionRegex.exec(preprocessLine(line)))) continue; // The line is not an instruction, so skip it
 
+            // Convert the line number to an int and back to get the shortest string representation
             let lineNumNum = strictParseInt(m[InstructionPart.LINE_NUM]);
 
             if (isNaN(lineNumNum)) {
@@ -652,6 +662,32 @@ connection.onDocumentFormatting(
             const operand1Spaces = maxOperand1Len - operand1Len;
             const operand2Spaces = maxOperand2Len - operand2Len;
             const operand3Spaces = maxOperand3Len - operand3Len;
+
+            /* What follows is some somewhat confusing formatting code. I'll try to explain it as best I can:
+             * For each part of the instruction (line number/instruction/operands), we want to write the part
+             * (padded to the max length). Then, we need another space before the next part, however,
+             * we don't want to add a space if  the next part will not be included (in any instruction).
+             * The reason for this is as follows:
+             * If we have the code:
+             * 0 setn r1 1 # Set r1 to 1
+             * 1 setn r2 2 # Set r2 to 2
+             * None of the instructions includes a 3rd operand. If we add a space after the 2nd operand, we get:
+             * 0 setn r1 1  # Set r1 to 1
+             * 1 setn r2 2  # Set r2 to 2
+             * This is inconsistent with the case where there is a third operand. However, if we omit the space if
+             * just the current instruction (rather than all instructions) doesn't include the operand, the code
+             * 0 setn r1 1     # Set r1 to 1
+             * 1 add  r1 r1 r1 # Set r2 to 2
+             * Would get formatted to
+             * 0 setn r1 1    # Set r1 to 1
+             * 1 add  r1 r1 r1 # Set r2 to 2
+             * Because the padding for the 3rd operand is included on the first line, but not the space after the second operand.
+             * Next, we append any extra text. This is invalid code, but we don't want the formatter to just delete stuff.
+             * Unlike the other parts, this has a forced space before and after it (if it exists). The reasoning is that if the line has a comment,
+             * we always want a space before the comment, and if it doesn't have one, we can just trim the extra space (which we would do anyways).
+             * Because the second space is only added if the "other" part exists, there is never any double spacing.
+             * Finally, we append the comment (if there is one) and trim any extra whitespace.
+             */
 
             function spaceBetween(maxLen: number): string {
                 return maxLen === 0 ? '' : ' ';
@@ -679,6 +715,7 @@ connection.onHover(
             Return the description of the instruction or register at the cursor
         */
 
+        // Get the document
         const document = documents.get(params.textDocument.uri);
 
         if (!document) return { contents: [] }; // We can't read the document, so just return an empty array
@@ -760,6 +797,7 @@ connection.onReferences(
             Return all lines which jump to the line at the cursor
         */
 
+        // Get the document
         const document = documents.get(params.textDocument.uri);
 
         if (!document) return undefined; // We can't read the document, so just return undefined
@@ -769,6 +807,8 @@ connection.onReferences(
 
         const commentPos = line.indexOf('#');
         if (commentPos != -1 && params.position.character >= commentPos) return undefined; // The cursor is in a comment, so don't return anything
+
+        // We only support selecting the line number
 
         const spacePos = line.indexOf(' ');
         if (spacePos != -1 && params.position.character > spacePos) return undefined; // The cursor is after the instruction, so don't return anything
@@ -804,7 +844,7 @@ connection.onReferences(
             }
 
             // Check if the instruction is a jump or call
-            if (!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue;
+            if (!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue; // It's not :(
 
             // If it is, check if either of the operands are the line number
             if (m[InstructionPart.OPERAND1]) {

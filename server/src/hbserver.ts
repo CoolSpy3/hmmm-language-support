@@ -22,9 +22,15 @@ import { binaryRegex, decompileInstruction, formatBinaryNumber, parseBinaryInstr
 import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
-const connection = createConnection(ProposedFeatures.all)
-let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument)
+// Create a connection for the server
+const connection = createConnection(ProposedFeatures.all);
 
+// Create a document manager to listen for changes to text documents and keep track of their source
+// The client will send various document sync events. This object listens for those events and updates
+// document objects so we can read them later
+let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+
+// When the client connects, tell it what we can do
 connection.onInitialize((params: InitializeParams) => {
     return {
         // Tell the client what we can do
@@ -57,12 +63,17 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
     let diagnostics: Diagnostic[] = [];
 
+    // For each line of the document
     for (let i = 0; i < textDocument.lineCount; i++) {
         const lineRange = getRangeForLine(i);
         const line = textDocument.getText(lineRange);
 
+        if(!line.trim()) continue; // Skip empty lines
+
+        // Try to parse the line as an instruction
         const instruction = parseBinaryInstruction(line);
 
+        // If the line isn't a valid instruction, add a diagnostic
         if (!instruction) {
             diagnostics.push({
                 severity: DiagnosticSeverity.Error,
@@ -75,7 +86,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 }
 
 documents.onDidChangeContent(change => {
-    validateTextDocument(change.document); // When the document changes, validate it
+    validateTextDocument(change.document); // When the document changes, revalidate it
 });
 
 connection.languages.inlayHint.on(
@@ -84,17 +95,21 @@ connection.languages.inlayHint.on(
             Show inlay hint disassembly for each instruction
         */
 
+        // Get the document from the document manager
         let document = documents.get(params.textDocument.uri);
 
         if (!document) return []; // If the document doesn't exist, return an empty array
 
         let hints: InlayHint[] = [];
 
+        // For each line of the document
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.getText(getRangeForLine(i));
 
+            // Try to parse the line as an instruction
             const instruction = parseBinaryInstruction(line);
 
+            // If the line is a valid instruction, add an inlay hint showing its disassembly
             if (instruction) {
                 hints.push({
                     label: ` ${decompileInstruction(instruction)}`,
@@ -116,15 +131,18 @@ connection.languages.semanticTokens.on(
             Show semantic tokens for each instruction
         */
 
+        // Get the document from the document manager
         let document = documents.get(params.textDocument.uri);
 
         const tokenBuilder = new SemanticTokensBuilder();
 
-        if (!document) return tokenBuilder.build(); // If the document doesn't exist, return an empty array
+        if (!document) return tokenBuilder.build(); // If the document doesn't exist, don't return any tokens
 
+        // For each line of the document
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.getText(getRangeForLine(i));
 
+            // Try to parse the line as an instruction
             const instruction = parseBinaryInstruction(line);
 
             if (!instruction) continue; // If the line isn't a valid instruction, skip it
@@ -134,6 +152,8 @@ connection.languages.semanticTokens.on(
             if (!(m = binaryRegex.exec(line))?.indices) continue; // If the line doesn't match the regex, skip it
 
             // Highlight the instruction
+
+            // The first nibble is always part of the opcode
             tokenBuilder.push(i, m.indices[1][0], 4, TokenTypes.keyword, 0);
 
             /**
@@ -166,13 +186,16 @@ connection.languages.semanticTokens.on(
                 case 'unsigned_number':
                     {
                         hasNumericOperand = true;
+                        // If the operand is a number, the first nibble is part of the opcode
                         tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
+                        // and the last two nibbles are the number
                         tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
                         tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
                         break;
                     }
                 case undefined:
                 default:
+                    // There is no operand 1, so the nibble part of the opcode
                     tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
             }
             switch (instruction.instruction.operand2) {
@@ -193,6 +216,7 @@ connection.languages.semanticTokens.on(
                 case undefined:
                 default:
                     if (!hasNumericOperand) {
+                        // There is no operand 2, so the nibble part of the opcode
                         tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.keyword, 0);
                     }
             }
@@ -213,6 +237,7 @@ connection.languages.semanticTokens.on(
                 case undefined:
                 default:
                     if (!hasNumericOperand) {
+                        // There is no operand 3, so the nibble part of the opcode
                         tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.keyword, 0);
                     }
             }
@@ -228,23 +253,30 @@ connection.onDocumentFormatting(
             Format the document
         */
 
+        // Get the document from the document manager
         let document = documents.get(params.textDocument.uri);
 
         if (!document) return []; // If the document doesn't exist, return an empty array
 
         let edits: TextEdit[] = [];
 
+        // For each line of the document
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.getText(getRangeForLine(i)).trim();
 
+            if (!line) continue; // Skip empty lines
+
+            // Format the line
             const formattedLine = formatBinaryNumber(line);
 
+            // If formatting the line changed it, add an edit to make the change
             if (line !== formattedLine) edits.push({
                 range: getRangeForLine(i),
                 newText: formattedLine
             });
         }
 
+        // Apply trailing newline edits
         const trailingNewlineEdit = applyTrailingNewlineEdits(params, document);
         if (trailingNewlineEdit) edits.push(trailingNewlineEdit);
 

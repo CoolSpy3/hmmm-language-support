@@ -48,10 +48,18 @@ export function getRangeForLine(line: number): Range {
     return Range.create(line, uinteger.MIN_VALUE, line, uinteger.MAX_VALUE);
 }
 
+/**
+ * Creates a TextEdit which applies the requested trailing newline edits from the given DocumentFormattingParams
+ * @param params The DocumentFormattingParams to get the edits from
+ * @param document The document to apply the edits to
+ * @returns A TextEdit which applies the requested trailing newline edits or undefined if no edits should be applied
+ */
 export function applyTrailingNewlineEdits(params: DocumentFormattingParams, document: TextDocument): TextEdit | undefined {
     if (params.options.insertFinalNewline || params.options.trimFinalNewlines) {
+        // Calculate the number of trailing newlines
         let numTrailingNewLines = 0;
 
+        // Count backwards from the end of the document until we find a non-empty line
         for (let i = document.lineCount - 1; i >= 0; i--) {
             const line = document.getText(getRangeForLine(i));
 
@@ -68,6 +76,7 @@ export function applyTrailingNewlineEdits(params: DocumentFormattingParams, docu
         }
     }
 
+    // No edits should be applied
     return undefined;
 }
 

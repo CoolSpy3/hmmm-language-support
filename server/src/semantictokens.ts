@@ -36,17 +36,25 @@ export enum TokenModifiers {
 	_ = 10,
 }
 
+/**
+ * Compute a semantic tokens legend for all tokens used by the server
+ * @param capability The client capabilities
+ * @returns A legend which maps all tokens used by the server to types used by the client
+ */
 export function computeLegend(capability: SemanticTokensClientCapabilities): SemanticTokensLegend {
 
 	const clientTokenTypes = new Set<string>(capability.tokenTypes);
 	const clientTokenModifiers = new Set<string>(capability.tokenModifiers);
 
 	const tokenTypes: string[] = [];
+	// For every token type used by the server,
 	for (let i = 0; i < TokenTypes._; i++) {
 		const str = TokenTypes[i];
 		if (clientTokenTypes.has(str)) {
+			// If the client supports the type, push it
 			tokenTypes.push(str);
 		} else {
+			// If the client doesn't support the type, push something so that the indices don't get misaligned
 			if (str === 'lambdaFunction') {
 				tokenTypes.push('function');
 			} else {
@@ -56,10 +64,15 @@ export function computeLegend(capability: SemanticTokensClientCapabilities): Sem
 	}
 
 	const tokenModifiers: string[] = [];
+	// For every token modifier used by the server,
 	for (let i = 0; i < TokenModifiers._; i++) {
 		const str = TokenModifiers[i];
 		if (clientTokenModifiers.has(str)) {
+			// If the client supports the modifier, push it
 			tokenModifiers.push(str);
+		} else {
+			// If the client doesn't support the modifier, push something so that the indices don't get misaligned
+			tokenModifiers.push('')
 		}
 	}
 

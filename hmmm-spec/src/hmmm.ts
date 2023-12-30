@@ -266,7 +266,7 @@ export function preprocessLine(line: string) {
 //#region Binary
 
 /**
- * A regular expression that matches a binary string containing 4 nibbles (4 bit sets) optionally separated/surrounded by spaces
+ * A regular expression that matches a binary string containing 4 nibbles optionally separated/surrounded by spaces
  */
 export const binaryRegex = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d;
 
@@ -531,7 +531,7 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
  * The result of breaking a {@link ParsedHMMMInstruction} into its components. This is a tuple containing,
  * 1. the numerical value of the compiled instruction,
  * 2. A ParsedHMMMInstruction object
- * 3. The register identified by the second nibble (4 bit set) (first operand) of the instruction or undefined if the instruction does not have a register as its first argument
+ * 3. The register identified by the second nibble (first operand) of the instruction or undefined if the instruction does not have a register as its first argument
  * 4. The register identified by the third nibble (second operand) of the instruction or undefined if the instruction does not have a register as its second argument
  * 5. The register identified by the fourth nibble (third operand) of the instruction or undefined if the instruction does not have a register as its third argument
  * 6. The numerical value (correctly parsed as either signed or unsigned) of the first/second argument of the instruction or undefined if the instruction does not have a numerical value as an argument
