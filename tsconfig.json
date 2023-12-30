@@ -21,7 +21,6 @@
 	],
 	"references": [
 		{ "path": "./client" },
-		{ "path": "./hmmm-spec" },
 		{ "path": "./server" }
 	]
 }
