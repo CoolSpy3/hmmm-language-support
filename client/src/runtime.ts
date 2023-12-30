@@ -483,14 +483,12 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param instruction The address to jump to
 	 */
 	public goto(instruction: number) {
-		// Create a stack frame so that the user can step back to the current instruction
-		this.createStackFrame();
-
-		// Add an entry to the instruction log so that reverse execution works property and the stack frame gets removed
+		// Add an entry to the instruction log and stack so that the user can step back to the current instruction and
+		// reverse execution works properly
 		// Regardless of the current instruction, say that it created a stack frame (because we just created one)
 		// Additionally, set oldData = undefined because we did not actually execute the current instruction, so nothing was modified
 		// (it should be ignored during reverse execution)
-		this.updateInstructionLog(true);
+		this.updateLogs(true);
 
 		// Set the instruction pointer to the given address
 		this.instructionPointer = instruction;
@@ -700,16 +698,17 @@ export class HMMMRuntime extends EventEmitter {
 		// We have to update the stack and instruction log before we increment the instruction pointer because
 		// the current instruction pointer must be included in both entries
 
-		// Push an entry to the instruction log corresponding to the current instruction
-		// We push a stack frame if and only if the instruction modified the instruction pointer
-		this.updateInstructionLog(nextInstructionPointer !== undefined, oldData);
-
 		// If the instruction modified the instruction pointer,
 		if (nextInstructionPointer !== undefined) {
-			// Create a stack frame and set the instruction pointer to the new address
-			this.createStackFrame();
+			// Create a stack frame and push an entry to the instruction log
+			this.updateLogs(true, oldData);
+
+			// Set the instruction pointer to the new address
 			this.instructionPointer = nextInstructionPointer;
-		} else {
+		} else { // Otherwise,
+			// Push an entry to the instruction log corresponding to the current instruction
+			this.updateLogs(false, oldData);
+
 			// Otherwise, just increment the instruction pointer
 			this.instructionPointer++;
 		}
@@ -922,7 +921,7 @@ export class HMMMRuntime extends EventEmitter {
 		this._registers = [...frame.registers];
 		this._memory = [...frame.memory];
 		this._modifiedMemory = new Set(frame.modifiedMemory);
-		this._stack = this._stack.slice(0, frameId);
+		this._stack = this._stack.slice(frameId + 1);
 
 		// Remove all instructions from the instruction log that added after the frame was created
 		if (frame.lastExecutedInstructionId) {
@@ -951,7 +950,9 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	/**
-	 * Creates a stack frame for the current state of the machine and pushes it onto the top of the stack
+	 * Creates a stack frame for the current state of the machine and pushes it onto the top of the stack.
+	 * In order to properly support restarting stack frames, this must be called before {@link updateInstructionLog}
+	 * to ensure the correct instructionId is used for the stack. It is recommended to use {@link updateLogs} instead.
 	 */
 	private createStackFrame() {
 		// If the stack is not enabled, do nothing
@@ -972,7 +973,9 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	/**
-	 * Updates the instruction log with an entry corresponding to the current instruction and the given information
+	 * Updates the instruction log with an entry corresponding to the current instruction and the given information.
+	 * In order to properly support restarting stack frames, this must be called after {@link createStackFrame} to ensure
+	 * he correct instructionId is used for the stack. It is recommended to use {@link updateLogs} instead.
 	 * @param didCreateStackFrame Whether or not the current instruction created a stack frame (Which will need to be removed if the instruction is reversed)
 	 * @param oldData The old value of the register/memory address that was modified by the instruction (Used to revert the change during reverse execution)
 	 */
@@ -1000,6 +1003,17 @@ export class HMMMRuntime extends EventEmitter {
 			didCreateStackFrame: didCreateStackFrame && this._stackEnabled,
 			oldData: oldData
 		});
+	}
+
+	/**
+	 * Because the stack frame and the instruction log should always be updated together, this function updates both of them
+	 *
+	 * @param createStackFrame Whether or not to create a stack frame for the current instruction
+	 * @param oldData The old value of the register/memory address that was modified by the instruction (Used to revert the change during reverse execution)
+	 */
+	private updateLogs(createStackFrame: boolean, oldData?: number) {
+		if(createStackFrame) this.createStackFrame();
+		this.updateInstructionLog(createStackFrame, oldData);
 	}
 
 	//#endregion
