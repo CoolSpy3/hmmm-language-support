@@ -1,25 +1,19 @@
-export enum HMMMOperandType {
-    REGISTER = 1, // Without the =1, TypeScript is unhappy
-    SIGNED_NUMBER,
-    UNSIGNED_NUMBER
-}
-
-export type HMMMOperand = HMMMOperandType | undefined;
+export type HMMMOperandType = 'register' | 'signed_number' | 'unsigned_number';
 
 export interface HMMMInstruction {
     name: string;
     opcode: number;
     mask: number;
-    operand1: HMMMOperand;
-    operand2: HMMMOperand;
-    operand3: HMMMOperand;
+    operand1?: HMMMOperandType;
+    operand2?: HMMMOperandType;
+    operand3?: HMMMOperandType;
     description: string;
 }
 
 export let hmmmInstructions: HMMMInstruction[];
 
 {
-    function hmmmInstr(name: string, opcode: number, operand1: HMMMOperand, operand2: HMMMOperand, operand3: HMMMOperand, description: string): HMMMInstruction {
+    function hmmmInstr(name: string, opcode: number, operand1: HMMMOperandType | undefined, operand2: HMMMOperandType | undefined, operand3: HMMMOperandType | undefined, description: string): HMMMInstruction {
         const instr = { name, opcode, mask: 0, operand1, operand2, operand3, description };
         instr.mask = getInstructionMask(instr);
         return instr;
@@ -27,31 +21,31 @@ export let hmmmInstructions: HMMMInstruction[];
 
     hmmmInstructions = [
         hmmmInstr("halt", 0b0000_0000_0000_0000, undefined, undefined, undefined, "Halt Program!"),
-        hmmmInstr("read", 0b0000_0000_0000_0001, HMMMOperandType.REGISTER, undefined, undefined, "Stop for user input, which will then be stored in register rX (input is an integer from -32768 to +32767)"),
-        hmmmInstr("write", 0b0000_0000_0000_0010, HMMMOperandType.REGISTER, undefined, undefined, "Print contents of register rX"),
-        hmmmInstr("jumpr", 0b0000_0000_0000_0011, HMMMOperandType.REGISTER, undefined, undefined, "Set program counter to address in rX"),
-        hmmmInstr("setn", 0b0001_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.SIGNED_NUMBER, undefined, "Set register rX equal to the integer N (-128 to +127)"),
-        hmmmInstr("loadn", 0b0010_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "Load register rX with the contents of memory address N"),
-        hmmmInstr("storen", 0b0011_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "Store contents of register rX into memory address N"),
-        hmmmInstr("loadr", 0b0100_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Load register rX with the contents of memory address N"),
-        hmmmInstr("storer", 0b0100_0000_0000_0001, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Store contents of register rX into memory address held in reg. rY"),
-        hmmmInstr("popr", 0b0100_0000_0000_0010, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Load contents of register rX from stack pointed to by reg. rY"),
-        hmmmInstr("pushr", 0b0100_0000_0000_0011, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Store contents of register rX onto stack pointed to by reg. rY"),
-        hmmmInstr("addn", 0b0101_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.SIGNED_NUMBER, undefined, "Add integer N (-128 to 127) to register rX"),
+        hmmmInstr("read", 0b0000_0000_0000_0001, 'register', undefined, undefined, "Stop for user input, which will then be stored in register rX (input is an integer from -32768 to +32767)"),
+        hmmmInstr("write", 0b0000_0000_0000_0010, 'register', undefined, undefined, "Print contents of register rX"),
+        hmmmInstr("jumpr", 0b0000_0000_0000_0011, 'register', undefined, undefined, "Set program counter to address in rX"),
+        hmmmInstr("setn", 0b0001_0000_0000_0000, 'register', 'signed_number', undefined, "Set register rX equal to the integer N (-128 to +127)"),
+        hmmmInstr("loadn", 0b0010_0000_0000_0000, 'register', 'unsigned_number', undefined, "Load register rX with the contents of memory address N"),
+        hmmmInstr("storen", 0b0011_0000_0000_0000, 'register', 'unsigned_number', undefined, "Store contents of register rX into memory address N"),
+        hmmmInstr("loadr", 0b0100_0000_0000_0000, 'register', 'register', undefined, "Load register rX with the contents of memory address N"),
+        hmmmInstr("storer", 0b0100_0000_0000_0001, 'register', 'register', undefined, "Store contents of register rX into memory address held in reg. rY"),
+        hmmmInstr("popr", 0b0100_0000_0000_0010, 'register', 'register', undefined, "Load contents of register rX from stack pointed to by reg. rY"),
+        hmmmInstr("pushr", 0b0100_0000_0000_0011, 'register', 'register', undefined, "Store contents of register rX onto stack pointed to by reg. rY"),
+        hmmmInstr("addn", 0b0101_0000_0000_0000, 'register', 'signed_number', undefined, "Add integer N (-128 to 127) to register rX"),
         hmmmInstr("nop", 0b0110_0000_0000_0000, undefined, undefined, undefined, "Do nothing"),
-        hmmmInstr("copy", 0b0110_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Set rX = rY"),
-        hmmmInstr("add", 0b0110_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rX = rY + rZ"),
-        hmmmInstr("neg", 0b0111_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, undefined, "Set rX = -rY"),
-        hmmmInstr("sub", 0b0111_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rX = rY - rZ"),
-        hmmmInstr("mul", 0b1000_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rx = rY * rZ"),
-        hmmmInstr("div", 0b1001_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rX = rY // rZ (integer division; rounds down; no remainder)"),
-        hmmmInstr("mod", 0b1010_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, HMMMOperandType.REGISTER, "Set rX = rY % rZ (returns the remainder of integer division)"),
-        hmmmInstr("jumpn", 0b1011_0000_0000_0000, HMMMOperandType.UNSIGNED_NUMBER, undefined, undefined, "Set program counter to address N"),
-        hmmmInstr("calln", 0b1011_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "Copy addr. of next instr. into rX and then jump to mem. addr. N"),
-        hmmmInstr("jeqzn", 0b1100_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX == 0, then jump to line N"),
-        hmmmInstr("jnezn", 0b1101_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX != 0, then jump to line N"),
-        hmmmInstr("jgtzn", 0b1110_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX > 0, then jump to line N"),
-        hmmmInstr("jltzn", 0b1111_0000_0000_0000, HMMMOperandType.REGISTER, HMMMOperandType.UNSIGNED_NUMBER, undefined, "If rX < 0, then jump to line N"),
+        hmmmInstr("copy", 0b0110_0000_0000_0000, 'register', 'register', undefined, "Set rX = rY"),
+        hmmmInstr("add", 0b0110_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY + rZ"),
+        hmmmInstr("neg", 0b0111_0000_0000_0000, 'register', 'register', undefined, "Set rX = -rY"),
+        hmmmInstr("sub", 0b0111_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY - rZ"),
+        hmmmInstr("mul", 0b1000_0000_0000_0000, 'register', 'register', 'register', "Set rx = rY * rZ"),
+        hmmmInstr("div", 0b1001_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY // rZ (integer division; rounds down; no remainder)"),
+        hmmmInstr("mod", 0b1010_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY % rZ (returns the remainder of integer division)"),
+        hmmmInstr("jumpn", 0b1011_0000_0000_0000, 'unsigned_number', undefined, undefined, "Set program counter to address N"),
+        hmmmInstr("calln", 0b1011_0000_0000_0000, 'register', 'unsigned_number', undefined, "Copy addr. of next instr. into rX and then jump to mem. addr. N"),
+        hmmmInstr("jeqzn", 0b1100_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX == 0, then jump to line N"),
+        hmmmInstr("jnezn", 0b1101_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX != 0, then jump to line N"),
+        hmmmInstr("jgtzn", 0b1110_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX > 0, then jump to line N"),
+        hmmmInstr("jltzn", 0b1111_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX < 0, then jump to line N"),
     ];
 }
 
@@ -89,32 +83,22 @@ export enum InstructionPart {
     OTHER = 6,
 }
 
-export enum HMMMDetectedOperandType {
-    R0,
-    REGISTER,
-    INVALID_REGISTER,
-    NUMBER,
-    SIGNED_NUMBER,
-    UNSIGNED_NUMBER,
-    INVALID_NUMBER
-}
-
-export type HMMMDetectedOperand = HMMMDetectedOperandType | undefined;
+export type HMMMDetectedOperandType = 'r0' | 'register' | 'invalid_register' | 'number' | 'signed_number' | 'unsigned_number' | 'invalid_number';
 
 /**
  * Determines the type of an operand
  * @param operand The string to check
  * @returns The detected operand type or undefined if the operand is invalid
  */
-export function validateOperand(operand: string): HMMMDetectedOperand {
+export function validateOperand(operand: string | undefined): HMMMDetectedOperandType | undefined {
     if (!operand) return undefined;
 
-    if (/^r0$/i.test(operand)) return HMMMDetectedOperandType.R0; // Test for r0 separately. It might be useful to be able to distinguish it later
+    if (operand === 'r0' || operand === 'R0') return 'r0'; // Test for r0 separately. It might be useful to be able to distinguish it later
 
     // Check if the argument is a register
     if (/^r\d+$/i.test(operand)) {
-        if (/^r(\d|1[0-5])$/i.test(operand)) return HMMMDetectedOperandType.REGISTER; // r0-r15
-        return HMMMDetectedOperandType.INVALID_REGISTER; // r16+
+        if (/^r(\d|1[0-5])$/i.test(operand)) return 'register'; // r0-r15
+        return 'invalid_register'; // r16+
     }
 
     // Test if the argument is a number
@@ -122,10 +106,10 @@ export function validateOperand(operand: string): HMMMDetectedOperand {
 
     if (isNaN(num)) return undefined; // Not a number
 
-    if (num < -128 || num > 255) return HMMMDetectedOperandType.INVALID_NUMBER; // Out of range of what can be represented in HMMM binary
-    if (num < 0) return HMMMDetectedOperandType.SIGNED_NUMBER; // Can be represented as a signed number
-    if (num > 127) return HMMMDetectedOperandType.UNSIGNED_NUMBER; // Can be represented as an unsigned number
-    return HMMMDetectedOperandType.NUMBER; // Can be represented as either a signed or unsigned number
+    if (num < -128 || num > 255) return 'invalid_number'; // Out of range of what can be represented in HMMM binary
+    if (num < 0) return 'signed_number'; // Can be represented as a signed number
+    if (num > 127) return 'unsigned_number'; // Can be represented as an unsigned number
+    return 'number'; // Can be represented as either a signed or unsigned number
 }
 
 /**
@@ -137,15 +121,15 @@ export function getInstructionSignature(instr: HMMMInstruction): string {
     let sig = '';
 
     if (instr.operand1) {
-        sig += `${instr.operand1 === HMMMOperandType.REGISTER ? 'rX' : 'N'}`;
+        sig += `${instr.operand1 === 'register' ? 'rX' : 'N'}`;
     }
 
     if (instr.operand2) {
-        sig += ` ${instr.operand2 === HMMMOperandType.REGISTER ? 'rY' : 'N'}`;
+        sig += ` ${instr.operand2 === 'register' ? 'rY' : 'N'}`;
     }
 
     if (instr.operand3) {
-        sig += ` ${instr.operand3 === HMMMOperandType.REGISTER ? 'rZ' : 'N'}`;
+        sig += ` ${instr.operand3 === 'register' ? 'rZ' : 'N'}`;
     }
 
     return sig;
@@ -165,7 +149,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     rep = rep.padEnd(19, ' '); // Shouldn't be necessary, but just in case
 
     if (instr.operand1) {
-        if (instr.operand1 === HMMMOperandType.REGISTER) {
+        if (instr.operand1 === 'register') {
             rep = `${rep.substring(0, 4)} XXXX ${rep.substring(10)}`;
         } else {
             rep = `${rep.substring(0, 9)} NNNN NNNN`;
@@ -173,7 +157,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     }
 
     if (instr.operand2) {
-        if (instr.operand2 === HMMMOperandType.REGISTER) {
+        if (instr.operand2 === 'register') {
             rep = `${rep.substring(0, 9)} YYYY ${rep.substring(15)}`;
         } else {
             rep = `${rep.substring(0, 9)} NNNN NNNN`;
@@ -181,7 +165,7 @@ export function getInstructionRepresentation(instr: HMMMInstruction): string {
     }
 
     if (instr.operand3) {
-        if (instr.operand3 === HMMMOperandType.REGISTER) {
+        if (instr.operand3 === 'register') {
             rep = `${rep.substring(0, 14)} ZZZZ`;
         } else {
             // All numbers are represented with 8 bits, so the third argument cannot be a number
@@ -212,11 +196,11 @@ export function getInstructionMask(instr: HMMMInstruction): number {
     let mask = 0b1111_1111_1111_1111;
 
     // An operand is 4 bits long, so remove 4 bits for each operand
-    if (instr.operand1 === HMMMOperandType.REGISTER) {
+    if (instr.operand1 === 'register') {
         mask &= 0b1111_0000_1111_1111;
     }
 
-    const hasNumericalArg = instr.operand1 === HMMMOperandType.SIGNED_NUMBER || instr.operand1 === HMMMOperandType.UNSIGNED_NUMBER || instr.operand2 === HMMMOperandType.SIGNED_NUMBER || instr.operand2 === HMMMOperandType.UNSIGNED_NUMBER;
+    const hasNumericalArg = instr.operand1 === 'signed_number' || instr.operand1 === 'unsigned_number' || instr.operand2 === 'signed_number' || instr.operand2 === 'unsigned_number';
 
     // Except for numbers, which are 8 bits long
     if (instr.operand2 || hasNumericalArg) {
@@ -270,12 +254,12 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
      */
     function parseOperand(operandType: HMMMOperandType, operand: string): ParsedHMMMOperand {
         switch (operandType) {
-            case HMMMOperandType.REGISTER:
-                return { type: HMMMOperandType.REGISTER, value: parseInt(operand, 2) };
-            case HMMMOperandType.SIGNED_NUMBER:
-                return { type: HMMMOperandType.SIGNED_NUMBER, value: parseSignedInt(line.substring(8, 16)) };
-            case HMMMOperandType.UNSIGNED_NUMBER:
-                return { type: HMMMOperandType.UNSIGNED_NUMBER, value: parseInt(line.substring(8, 16), 2) };
+            case 'register':
+                return { type: 'register', value: parseInt(operand, 2) };
+            case 'signed_number':
+                return { type: 'signed_number', value: parseSignedInt(line.substring(8, 16)) };
+            case 'unsigned_number':
+                return { type: 'unsigned_number', value: parseInt(line.substring(8, 16), 2) };
         }
     }
 
@@ -288,7 +272,7 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
     }
 
     if (instr.operand3) {
-        if (instr.operand3 === HMMMOperandType.SIGNED_NUMBER || instr.operand3 === HMMMOperandType.UNSIGNED_NUMBER) {
+        if (instr.operand3 === 'signed_number' || instr.operand3 === 'unsigned_number') {
             // All numbers are represented with 8 bits, so the third argument cannot be a number
             console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
         } else {
@@ -312,7 +296,7 @@ export function decompileInstruction(instruction: string | number | ParsedHMMMIn
 
         instruction = parsedInstruction;
     }
-    return `${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === HMMMOperandType.REGISTER ? 'r' : ''}${operand.value}`).join(' ')}`;
+    return `${instruction.instruction.name}${instruction.operands.length !== 0 ? ' ' : ''}${instruction.operands.map(operand => `${operand.type === 'register' ? 'r' : ''}${operand.value}`).join(' ')}`;
 }
 
 /**
@@ -355,64 +339,52 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
 
         let binary = instr.opcode;
 
-        if (instr.operand1) {
-            const operand = validateOperand(m[InstructionPart.OPERAND1]);
+        function parseOperand(operandType: HMMMOperandType | undefined, stringValue: string | undefined, positionShift: number): number | undefined {
+            const operand = validateOperand(stringValue);
 
             if (operand === undefined) return undefined; // Invalid operand!
 
-            switch (instr.operand1) {
-                case HMMMOperandType.REGISTER:
-                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND1].slice(1)) << 8;
-                    break;
-                case HMMMOperandType.SIGNED_NUMBER:
-                    if (!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
-                    break;
-                case HMMMOperandType.UNSIGNED_NUMBER:
-                    if (!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND1]) & 0b1111_1111;
-                    break;
+            switch(operandType) {
+                case 'register':
+                    if (!(operand === 'r0' || operand === 'register')) return undefined; // Invalid operand!
+                    return parseInt(stringValue!.slice(1)) << positionShift;
+                case 'signed_number':
+                    if (!(operand === 'signed_number' || operand === 'number')) return undefined; // Invalid operand!
+                    return parseInt(stringValue!) & 0b1111_1111;
+                case 'unsigned_number':
+                    if (!(operand === 'unsigned_number' || operand === 'number')) return undefined; // Invalid operand!
+                    return parseInt(stringValue!) & 0b1111_1111;
             }
+        }
+
+        if(instr.operand1) {
+            const operand = parseOperand(instr.operand1, m[InstructionPart.OPERAND1], 8);
+
+            if (operand === undefined) return undefined; // Invalid operand!
+
+            binary |= operand;
         } else if (m[InstructionPart.OPERAND1]) return undefined; // Invalid operand!
 
-        if (instr.operand2) {
-            const operand = validateOperand(m[InstructionPart.OPERAND2]);
+        if(instr.operand2) {
+            const operand = parseOperand(instr.operand2, m[InstructionPart.OPERAND2], 4);
 
             if (operand === undefined) return undefined; // Invalid operand!
 
-            switch (instr.operand2) {
-                case HMMMOperandType.REGISTER:
-                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND2].slice(1)) << 4;
-                    break;
-                case HMMMOperandType.SIGNED_NUMBER:
-                    if (!(operand === HMMMDetectedOperandType.SIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
-                    break;
-                case HMMMOperandType.UNSIGNED_NUMBER:
-                    if (!(operand === HMMMDetectedOperandType.UNSIGNED_NUMBER || operand === HMMMDetectedOperandType.NUMBER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND2]) & 0b1111_1111;
-                    break;
-            }
+            binary |= operand;
         } else if (m[InstructionPart.OPERAND2]) return undefined; // Invalid operand!
 
-        if (instr.operand3) {
-            const operand = validateOperand(m[InstructionPart.OPERAND3]);
+        if(instr.operand3) {
+            if(instr.operand3 === 'signed_number' || instr.operand3 === 'unsigned_number') {
+                // All numbers are represented with 8 bits, so the third argument cannot be a number
+                console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
+                return undefined;
+            }
+
+            const operand = parseOperand(instr.operand3, m[InstructionPart.OPERAND3], 0);
 
             if (operand === undefined) return undefined; // Invalid operand!
 
-            switch (instr.operand3) {
-                case HMMMOperandType.REGISTER:
-                    if (!(operand === HMMMDetectedOperandType.R0 || operand === HMMMDetectedOperandType.REGISTER)) return undefined; // Invalid operand!
-                    binary |= parseInt(m[InstructionPart.OPERAND3].slice(1));
-                    break;
-                case HMMMOperandType.SIGNED_NUMBER:
-                case HMMMOperandType.UNSIGNED_NUMBER:
-                    // All numbers are represented with 8 bits, so the third argument cannot be a number
-                    console.error(`Invalid instruction! ${instr.name} has an operand 3 of type ${instr.operand3}`);
-                    return undefined;
-            }
+            binary |= operand;
         } else if (m[InstructionPart.OPERAND3]) return undefined; // Invalid operand!
 
         compiledCode.push(binary.toString(2).padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4"));

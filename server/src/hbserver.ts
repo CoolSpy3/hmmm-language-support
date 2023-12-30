@@ -18,7 +18,7 @@ import {
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
-import { HMMMOperandType, binaryRegex, decompileInstruction, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
+import { binaryRegex, decompileInstruction, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
 import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
@@ -156,14 +156,14 @@ connection.languages.semanticTokens.on(
 
             let hasNumericOperand = false;
             switch (instruction.instruction.operand1) {
-                case HMMMOperandType.REGISTER:
+                case 'register':
                     {
                         const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
                         tokenBuilder.push(i, m.indices[2][0], 4, tokenType, tokenModifier);
                         break;
                     }
-                case HMMMOperandType.SIGNED_NUMBER:
-                case HMMMOperandType.UNSIGNED_NUMBER:
+                case 'signed_number':
+                case 'unsigned_number':
                     {
                         hasNumericOperand = true;
                         tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
@@ -176,14 +176,14 @@ connection.languages.semanticTokens.on(
                     tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
             }
             switch (instruction.instruction.operand2) {
-                case HMMMOperandType.REGISTER:
+                case 'register':
                     {
                         const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[1].value);
                         tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
                         break;
                     }
-                case HMMMOperandType.SIGNED_NUMBER:
-                case HMMMOperandType.UNSIGNED_NUMBER:
+                case 'signed_number':
+                case 'unsigned_number':
                     {
                         hasNumericOperand = true;
                         tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
@@ -197,14 +197,14 @@ connection.languages.semanticTokens.on(
                     }
             }
             switch (instruction.instruction.operand3) {
-                case HMMMOperandType.REGISTER:
+                case 'register':
                     {
                         const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[2].value);
                         tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
                         break;
                     }
-                case HMMMOperandType.SIGNED_NUMBER:
-                case HMMMOperandType.UNSIGNED_NUMBER:
+                case 'signed_number':
+                case 'unsigned_number':
                     {
                         // Numbers are never the third operand, so this should never happen
                         console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);

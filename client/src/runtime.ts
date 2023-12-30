@@ -6,7 +6,6 @@ import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
 import { InputBoxOptions, window, workspace } from 'vscode';
 import {
-	HMMMOperandType,
 	ParsedHMMMInstruction,
 	binaryRegex,
 	compile,
@@ -1187,12 +1186,12 @@ export class HMMMRuntime extends EventEmitter {
 
 		// Retrieve the values from the ParsedHMMMInstruction and store them in the appropriate variables based on their type
 
-		if (instruction.instruction.operand1 === HMMMOperandType.REGISTER) rX = instruction.operands[0].value;
-		if (instruction.instruction.operand2 === HMMMOperandType.REGISTER) rY = instruction.operands[1].value;
-		if (instruction.instruction.operand3 === HMMMOperandType.REGISTER) rZ = instruction.operands[2].value;
+		if (instruction.instruction.operand1 === 'register') rX = instruction.operands[0].value;
+		if (instruction.instruction.operand2 === 'register') rY = instruction.operands[1].value;
+		if (instruction.instruction.operand3 === 'register') rZ = instruction.operands[2].value;
 
-		if (instruction.instruction.operand1 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand1 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[0].value;
-		if (instruction.instruction.operand2 === HMMMOperandType.SIGNED_NUMBER || instruction.instruction.operand2 === HMMMOperandType.UNSIGNED_NUMBER) N = instruction.operands[1].value;
+		if (instruction.instruction.operand1 === 'signed_number' || instruction.instruction.operand1 === 'unsigned_number') N = instruction.operands[0].value;
+		if (instruction.instruction.operand2 === 'signed_number' || instruction.instruction.operand2 === 'unsigned_number') N = instruction.operands[1].value;
 
 		// Return the parsed instruction
 		return [binaryInstruction, instruction, rX, rY, rZ, N];

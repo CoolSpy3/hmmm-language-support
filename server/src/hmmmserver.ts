@@ -25,10 +25,8 @@ import {
     uinteger
 } from 'vscode-languageserver/node';
 import {
-    HMMMDetectedOperand,
     HMMMDetectedOperandType,
     HMMMInstruction,
-    HMMMOperand,
     HMMMOperandType,
     InstructionPart,
     getInstructionByName,
@@ -162,7 +160,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
          * @param operandType The detected operand type
          * @param operandIdx The index of the operand in the regex match
          */
-        function reportOperandErrors(operandType: HMMMDetectedOperand, operandIdx: number) {
+        function reportOperandErrors(operandType: HMMMDetectedOperandType | undefined, operandIdx: number) {
             if (operandType === undefined) { // The operand is invalid
                 diagnostics.push({
                     severity: DiagnosticSeverity.Error,
@@ -171,7 +169,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     source: 'HMMM Language Server',
                     data: 'invalid_operand'
                 });
-            } else if (operandType === HMMMDetectedOperandType.INVALID_REGISTER) { // The operand is a register that is not r0-r15
+            } else if (operandType === 'invalid_register') { // The operand is a register that is not r0-r15
                 diagnostics.push({
                     severity: DiagnosticSeverity.Error,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
@@ -179,7 +177,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     source: 'HMMM Language Server',
                     data: 'invalid_register'
                 });
-            } else if (operandType === HMMMDetectedOperandType.INVALID_NUMBER) { // The operand is a number that is out of range
+            } else if (operandType === 'invalid_number') { // The operand is a number that is out of range
                 diagnostics.push({
                     severity: DiagnosticSeverity.Warning,
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
@@ -190,9 +188,9 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
             }
         }
 
-        let operand1Type: HMMMDetectedOperand = undefined;
-        let operand2Type: HMMMDetectedOperand = undefined;
-        let operand3Type: HMMMDetectedOperand = undefined;
+        let operand1Type: HMMMDetectedOperandType | undefined = undefined;
+        let operand2Type: HMMMDetectedOperandType | undefined = undefined;
+        let operand3Type: HMMMDetectedOperandType | undefined = undefined;
 
         // Validate the operands if they exist
         if (operand1) {
@@ -261,12 +259,12 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
          *
          * @returns true if the operand is missing and the code should stop checking for errors, false otherwise
          */
-        function reportOperandTypeMismatchErrors(operand: string, operandType: HMMMDetectedOperand, operandIdx: number, instruction: HMMMInstruction, expectedType: HMMMOperand): boolean {
+        function reportOperandTypeMismatchErrors(operand: string, operandType: HMMMDetectedOperandType | undefined, operandIdx: number, instruction: HMMMInstruction, expectedType: HMMMOperandType | undefined): boolean {
             if (expectedType) { // The instruction expects an operand
                 if (operand) { // An operand was provided
                     switch (expectedType) {
-                        case HMMMOperandType.REGISTER:
-                            if (operandType !== HMMMDetectedOperandType.REGISTER && operandType !== HMMMDetectedOperandType.R0 && operandType !== HMMMDetectedOperandType.INVALID_REGISTER) {
+                        case 'register':
+                            if (operandType !== 'register' && operandType !== 'r0' && operandType !== 'invalid_register') {
                                 diagnostics.push({ // The instruction expects a register, but the operand is not a register
                                     severity: DiagnosticSeverity.Error,
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
@@ -276,10 +274,10 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                 });
                             }
                             break;
-                        case HMMMOperandType.SIGNED_NUMBER:
-                            if (operandType !== HMMMDetectedOperandType.SIGNED_NUMBER && operandType !== HMMMDetectedOperandType.NUMBER) {
+                        case 'signed_number':
+                            if (operandType !== 'signed_number' && operandType !== 'number') {
                                 diagnostics.push({ // The instruction expects a signed number, but the operand is not a signed number
-                                    severity: operandType === HMMMDetectedOperandType.UNSIGNED_NUMBER || operandType === HMMMDetectedOperandType.INVALID_NUMBER ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
+                                    severity: operandType === 'unsigned_number' || operandType === 'invalid_number' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
                                     source: 'HMMM Language Server',
@@ -287,10 +285,10 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                 });
                             }
                             break;
-                        case HMMMOperandType.UNSIGNED_NUMBER:
-                            if (operandType !== HMMMDetectedOperandType.UNSIGNED_NUMBER && operandType !== HMMMDetectedOperandType.NUMBER) {
+                        case 'unsigned_number':
+                            if (operandType !== 'unsigned_number' && operandType !== 'number') {
                                 diagnostics.push({ // The instruction expects an unsigned number, but the operand is not an unsigned number
-                                    severity: operandType === HMMMDetectedOperandType.SIGNED_NUMBER || operandType === HMMMDetectedOperandType.INVALID_NUMBER ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
+                                    severity: operandType === 'signed_number' || operandType === 'invalid_number' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
                                     source: 'HMMM Language Server',
@@ -484,17 +482,17 @@ connection.onCompletion(
             return completionList;
         }
 
-        if ((!m[InstructionPart.OPERAND1] || isInIndexRange(position, InstructionPart.OPERAND1, indices)) && instruction.operand1 === HMMMOperandType.REGISTER) {
+        if ((!m[InstructionPart.OPERAND1] || isInIndexRange(position, InstructionPart.OPERAND1, indices)) && instruction.operand1 === 'register') {
             // The instruction expects a register argument, so suggest a register
             populateRegisters(completionList);
             return completionList;
         }
-        if ((!m[InstructionPart.OPERAND2] || isInIndexRange(position, InstructionPart.OPERAND2, indices)) && instruction.operand2 === HMMMOperandType.REGISTER) {
+        if ((!m[InstructionPart.OPERAND2] || isInIndexRange(position, InstructionPart.OPERAND2, indices)) && instruction.operand2 === 'register') {
             // The instruction expects a register argument, so suggest a register
             populateRegisters(completionList);
             return completionList;
         }
-        if ((!m[InstructionPart.OPERAND3] || isInIndexRange(position, InstructionPart.OPERAND3, indices)) && instruction.operand3 === HMMMOperandType.REGISTER) {
+        if ((!m[InstructionPart.OPERAND3] || isInIndexRange(position, InstructionPart.OPERAND3, indices)) && instruction.operand3 === 'register') {
             // The instruction expects a register argument, so suggest a register
             populateRegisters(completionList);
             return completionList;
