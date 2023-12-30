@@ -73,6 +73,10 @@ const lastOperandRegex = /(?:(\S+)\s*)?/gm;
 export const instructionRegex = RegExp(`^\\s*${operandRegex.source}${operandRegex.source}${operandRegex.source}${operandRegex.source}${lastOperandRegex.source}(?:\\s+(.+))?$`, 'md');
 export const binaryRegex = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d;
 
+export function formatBinaryNumber(line: string): string {
+    return line.padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4");
+}
+
 export enum InstructionPart {
     FULL_LINE = 0,
     LINE_NUM = 1,
@@ -387,7 +391,7 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
             binary |= operand;
         } else if (m[InstructionPart.OPERAND3]) return undefined; // Invalid operand!
 
-        compiledCode.push(binary.toString(2).padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4"));
+        compiledCode.push(formatBinaryNumber(binary.toString(2)));
     }
 
     return [compiledCode, lineMap];

@@ -18,7 +18,7 @@ import {
     createConnection,
     uinteger
 } from "vscode-languageserver/node";
-import { binaryRegex, decompileInstruction, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
+import { binaryRegex, decompileInstruction, formatBinaryNumber, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
 import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
 import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
 
@@ -237,7 +237,7 @@ connection.onDocumentFormatting(
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.getText(getRangeForLine(i)).trim();
 
-            const formattedLine = line.replace(binaryRegex, "$1 $2 $3 $4");
+            const formattedLine = formatBinaryNumber(line);
 
             if (line !== formattedLine) edits.push({
                 range: getRangeForLine(i),

@@ -16,7 +16,7 @@ import {
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { basename } from 'path';
 import { workspace } from 'vscode';
-import { binaryRegex, decompileInstruction, strictParseInt } from '../../hmmm-spec/out/hmmm';
+import { decompileInstruction, formatBinaryNumber, strictParseInt } from '../../hmmm-spec/out/hmmm';
 import { HMMMRuntime, s16IntToNumber } from './runtime';
 
 import { relative } from 'path';
@@ -918,7 +918,7 @@ export class HMMMDebugSession extends DebugSession {
 				numChildren = 0;
 			} else if (format === "binary") {
 				displayName = "Binary Value";
-				stringValue = value.toString(2).padStart(16, "0").replace(binaryRegex, "$1 $2 $3 $4");
+				stringValue = formatBinaryNumber(value.toString(2));
 				numChildren = 0;
 			} else if (format === "signed") {
 				displayName = "Signed Value";
