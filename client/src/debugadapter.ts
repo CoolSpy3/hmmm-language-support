@@ -887,7 +887,7 @@ export class HMMMDebugSession extends DebugSession {
 			attributes = ["readOnly"];
 		} else if (name === "ir") {
 			// The variable is the instruction register
-			value = decompileInstruction(frame.instruction) ?? "invalid instruction";
+			value = decompileInstruction(frame.memory[frame.instructionPointer]) ?? "invalid instruction";
 			attributes = ["readOnly"];
 		} else if (name.startsWith('r')) {
 			// The variable is a register
