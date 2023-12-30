@@ -76,19 +76,7 @@ documents.onDidChangeContent(change => {
 });
 
 // Keep track of error causes, so we can suggest fixes
-enum HMMMErrorType {
-    INVALID_LINE,
-    MISSING_LINE_NUM,
-    INCORRECT_LINE_NUM,
-    INVALID_OPERAND,
-    INVALID_REGISTER,
-    INVALID_NUMBER,
-    UNEXPECTED_TOKEN,
-    MISSING_INSTRUCTION,
-    INVALID_INSTRUCTION,
-    MISSING_OPERAND,
-    TOO_MANY_OPERANDS
-}
+type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'missing_operand' | 'too_many_operands';
 
 /**
  * Validates a text document and sends diagnostics to the client
@@ -129,7 +117,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: getRangeForLine(lineIdx),
                 message: `Invalid line!`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.INVALID_LINE
+                data: 'invalid_line'
             });
             continue;
         }
@@ -146,7 +134,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][0] + 1),
                 message: `Missing line number`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.MISSING_LINE_NUM
+                data: 'missing_line_num'
             });
 
             // Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
@@ -158,7 +146,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
                 message: `Incorrect line number! Should be ${numCodeLines}`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.INCORRECT_LINE_NUM
+                data: 'incorrect_line_num'
             });
         }
 
@@ -181,7 +169,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid operand!`,
                     source: 'HMMM Language Server',
-                    data: HMMMErrorType.INVALID_OPERAND
+                    data: 'invalid_operand'
                 });
             } else if (operandType === HMMMDetectedOperandType.INVALID_REGISTER) { // The operand is a register that is not r0-r15
                 diagnostics.push({
@@ -189,7 +177,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid register! HMMM only supports registers r0-r15`,
                     source: 'HMMM Language Server',
-                    data: HMMMErrorType.INVALID_REGISTER
+                    data: 'invalid_register'
                 });
             } else if (operandType === HMMMDetectedOperandType.INVALID_NUMBER) { // The operand is a number that is out of range
                 diagnostics.push({
@@ -197,7 +185,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `Invalid number! HMMM only supports numerical arguments from -128 to 127 (signed) or 0 to 255 (unsigned)`,
                     source: 'HMMM Language Server',
-                    data: HMMMErrorType.INVALID_NUMBER
+                    data: 'invalid_number'
                 });
             }
         }
@@ -226,7 +214,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: Range.create(lineIdx, indices[InstructionPart.OTHER][0], lineIdx, indices[InstructionPart.OTHER][1]),
                 message: `Unexpected token!`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.UNEXPECTED_TOKEN
+                data: 'unexpected_token'
             });
         }
 
@@ -239,7 +227,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: Range.create(lineIdx, Math.max(0, indices[InstructionPart.LINE_NUM][1] - 1), lineIdx, indices[InstructionPart.LINE_NUM][1]),
                 message: `Expected instruction`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.MISSING_INSTRUCTION
+                data: 'missing_instruction'
             });
             continue;
         }
@@ -254,7 +242,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                 range: Range.create(lineIdx, indices[InstructionPart.INSTRUCTION][0], lineIdx, indices[InstructionPart.INSTRUCTION][1]),
                 message: `Unknown instruction`,
                 source: 'HMMM Language Server',
-                data: HMMMErrorType.INVALID_INSTRUCTION
+                data: 'invalid_instruction'
             });
             continue;
         }
@@ -284,7 +272,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a register as operand 1`,
                                     source: 'HMMM Language Server',
-                                    data: HMMMErrorType.INVALID_REGISTER
+                                    data: 'invalid_register'
                                 });
                             }
                             break;
@@ -295,7 +283,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
                                     source: 'HMMM Language Server',
-                                    data: HMMMErrorType.INVALID_NUMBER
+                                    data: 'invalid_number'
                                 });
                             }
                             break;
@@ -306,7 +294,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                                     message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
                                     source: 'HMMM Language Server',
-                                    data: HMMMErrorType.INVALID_NUMBER
+                                    data: 'invalid_number'
                                 });
                             }
                             break;
@@ -317,7 +305,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                         range: Range.create(lineIdx, indices[InstructionPart.INSTRUCTION][0], lineIdx, indices[InstructionPart.INSTRUCTION][1]),
                         message: `${instruction.name} expects ${numExpectedArgs} argument${numExpectedArgs === 1 ? '' : 's'}`,
                         source: 'HMMM Language Server',
-                        data: HMMMErrorType.MISSING_OPERAND
+                        data: 'missing_operand'
                     });
                     return true; // There are no more operands to check (because this one was missing), so stop checking for errors
                 }
@@ -327,7 +315,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
                     range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
                     message: `${instruction.name} only expects ${numExpectedArgs} argument${numExpectedArgs === 1 ? '' : 's'}`,
                     source: 'HMMM Language Server',
-                    data: HMMMErrorType.TOO_MANY_OPERANDS
+                    data: 'too_many_operands'
                 });
             }
             return false;
@@ -364,7 +352,7 @@ connection.onCodeAction(
             const errorCode = diagnostic.data as HMMMErrorType;
 
             switch (errorCode) {
-                case HMMMErrorType.INCORRECT_LINE_NUM: // The line number is incorrect, so suggest changing it to the expected line number
+                case 'incorrect_line_num': // The line number is incorrect, so suggest changing it to the expected line number
                     {
                         const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
                         actions.push({
@@ -379,7 +367,7 @@ connection.onCodeAction(
                         });
                         break;
                     }
-                case HMMMErrorType.MISSING_LINE_NUM: // The line number is missing, so suggest adding it
+                case 'missing_line_num': // The line number is missing, so suggest adding it
                     {
                         const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
                         actions.push({
@@ -389,6 +377,34 @@ connection.onCodeAction(
                             edit: {
                                 changes: {
                                     [params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)) /* Replace the start of the line to the first non-space character */, correctLineNum.toString() + ' ')]
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case 'too_many_operands': // There are too many operands, so suggest removing the extra ones
+                    {
+                        actions.push({
+                            title: 'Remove Extra Operands',
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case 'unexpected_token':
+                    {
+                        actions.push({
+                            title: 'Remove Unexpected Token',
+                            kind: CodeActionKind.QuickFix,
+                            diagnostics: [diagnostic],
+                            edit: {
+                                changes: {
+                                    [params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
                                 }
                             }
                         });
