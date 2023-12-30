@@ -32,6 +32,7 @@ import {
     getInstructionByName,
     instructionRegex,
     preprocessLine,
+    strictParseInt,
     validateOperand
 } from '../../hmmm-spec/out/hmmm';
 import {
@@ -124,7 +125,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
         let indices = m.indices ?? defaultIndices;
         indices = indices.map(range => range ?? [uinteger.MIN_VALUE, uinteger.MAX_VALUE]); // Make sure all ranges are defined
 
-        const lineNum = parseInt(m[InstructionPart.LINE_NUM]); // Get the line number
+        const lineNum = strictParseInt(m[InstructionPart.LINE_NUM]); // Get the line number
 
         if (isNaN(lineNum)) { // The line number is not a number
             diagnostics.push({ // Add an error diagnostic
@@ -463,7 +464,7 @@ connection.onCompletion(
             // The cursor is in the line number, so suggest the next line number
             populateLineNumber(completionList, params.position.line, document);
 
-            if (isNaN(parseInt(m[InstructionPart.LINE_NUM]))) populateInstructions(completionList); // The line number is invalid, so suggest an instruction
+            if (isNaN(strictParseInt(m[InstructionPart.LINE_NUM]))) populateInstructions(completionList); // The line number is invalid, so suggest an instruction
 
             return completionList;
         }
@@ -522,7 +523,7 @@ connection.onDefinition(
 
         const word = getSelectedWord(document, params.position)[0]; // Get the word at the cursor
 
-        const lineNum = parseInt(word); // Try to interpret the word as a line number
+        const lineNum = strictParseInt(word); // Try to interpret the word as a line number
 
         if (isNaN(lineNum) || lineNum < 0) return []; // The word is not a valid line number, so don't return anything
 
@@ -545,7 +546,7 @@ connection.onDefinition(
             if (!line) continue; // Skip empty lines
 
             // Try to parse the instruction number
-            const num = parseInt(line);
+            const num = strictParseInt(line);
             if (num === lineNum) { // The instruction number matches the number we're looking for
                 definitions.push({ // Add the line to the definitions
                     uri: params.textDocument.uri,
@@ -589,7 +590,7 @@ connection.onDocumentFormatting(
             let m: RegExpMatchArray | null;
             if (!(m = instructionRegex.exec(line))) continue; // The line is not an instruction, so skip it
 
-            let lineNumNum = parseInt(m[InstructionPart.LINE_NUM]);
+            let lineNumNum = strictParseInt(m[InstructionPart.LINE_NUM]);
 
             if (isNaN(lineNumNum)) {
                 // Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
@@ -633,7 +634,7 @@ connection.onDocumentFormatting(
             let m: RegExpMatchArray | null;
             if (!(m = instructionRegex.exec(preprocessLine(line)))) continue; // The line is not an instruction, so skip it
 
-            let lineNumNum = parseInt(m[InstructionPart.LINE_NUM]);
+            let lineNumNum = strictParseInt(m[InstructionPart.LINE_NUM]);
 
             if (isNaN(lineNumNum)) {
                 // Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
@@ -774,7 +775,7 @@ connection.onReferences(
 
         const word = getSelectedWord(document, params.position); // Get the word at the cursor
 
-        const lineNum = parseInt(word[0]); // Try to interpret the word as a line number
+        const lineNum = strictParseInt(word[0]); // Try to interpret the word as a line number
 
         if (isNaN(lineNum) || lineNum < 0) return undefined; // The word is not a valid line number, so don't return anything
 
@@ -808,7 +809,7 @@ connection.onReferences(
             // If it is, check if either of the operands are the line number
             if (m[InstructionPart.OPERAND1]) {
                 const operand1 = m[InstructionPart.OPERAND1];
-                if (parseInt(operand1) === lineNum) {
+                if (strictParseInt(operand1) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
                         range: getRangeForLine(i)
@@ -818,7 +819,7 @@ connection.onReferences(
 
             if (m[InstructionPart.OPERAND2]) {
                 const operand2 = m[InstructionPart.OPERAND2];
-                if (parseInt(operand2) === lineNum) {
+                if (strictParseInt(operand2) === lineNum) {
                     locations.push({
                         uri: params.textDocument.uri,
                         range: getRangeForLine(i)

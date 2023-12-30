@@ -16,7 +16,7 @@ import {
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { basename } from 'path';
 import { workspace } from 'vscode';
-import { binaryRegex, decompileInstruction } from '../../hmmm-spec/out/hmmm';
+import { binaryRegex, decompileInstruction, strictParseInt } from '../../hmmm-spec/out/hmmm';
 import { HMMMRuntime, s16IntToNumber } from './runtime';
 
 import { relative } from 'path';
@@ -205,9 +205,6 @@ export class HMMMDebugSession extends DebugSession {
 	 * Sent by the frontend to launch the program with the provided configuration information.
 	 */
 	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments) {
-		// Acknowledge that the launch request has been received
-		this.sendResponse(response);
-
 		// Get the absolute path to the program to debug
 		const program = this.convertClientPathToDebugger(args.program);
 
@@ -220,6 +217,9 @@ export class HMMMDebugSession extends DebugSession {
 			this.sendErrorResponse(response, 1, "Program contains errors! Please fix them before debugging.", undefined, ErrorDestination.User);
 			return;
 		}
+
+		// Acknowledge that the launch request has been received and processed successfully
+		this.sendResponse(response);
 
 		// Setup a callback to start the runtime once the configuration is done
 		this._onConfigurationDone = function () {
@@ -492,7 +492,7 @@ export class HMMMDebugSession extends DebugSession {
 
 					if (bp.dataId.startsWith("addr_")) {
 						// If the breakpoint refers to a memory address check that the address is valid
-						const address = parseInt(bp.dataId.substring("addr_".length));
+						const address = strictParseInt(bp.dataId.substring("addr_".length));
 						if (isNaN(address) || address < 0 || address > 255) {
 							// If not, return a breakpoint with verified = false and a message explaining why
 							return <DebugProtocol.Breakpoint>{
@@ -508,7 +508,7 @@ export class HMMMDebugSession extends DebugSession {
 						}
 					} else {
 						// If the breakpoint refers to a register check that the register is valid
-						const register = parseInt(bp.dataId.substring(1));
+						const register = strictParseInt(bp.dataId.substring(1));
 						if (isNaN(register) || register < 0 || register > 15) {
 							// If not, return a breakpoint with verified = false and a message explaining why
 							return <DebugProtocol.Breakpoint>{
@@ -836,7 +836,7 @@ export class HMMMDebugSession extends DebugSession {
 			const indexOfDot = name.indexOf('.');
 			if (indexOfDot >= 0) {
 				// The frame number is the number between "frame_" and the first dot
-				frame = parseInt(name.substring('frame_'.length, indexOfDot));
+				frame = strictParseInt(name.substring('frame_'.length, indexOfDot));
 				// Remove the frame number from the name
 				name = name.substring(indexOfDot + 1);
 			} else {
@@ -869,7 +869,7 @@ export class HMMMDebugSession extends DebugSession {
 		name = name.toLowerCase();
 
 		// If the name is a number, assume it refers to a memory address
-		if (!isNaN(parseInt(name))) name = `addr_${name}`;
+		if (!isNaN(strictParseInt(name))) name = `addr_${name}`;
 
 		// Attempt to retrieve the stack frame that the variable refers to
 		const frame = this._runtime.getStateAtFrame(stackFrame);
@@ -891,14 +891,14 @@ export class HMMMDebugSession extends DebugSession {
 			attributes = ["readOnly"];
 		} else if (name.startsWith('r')) {
 			// The variable is a register
-			const register = parseInt(name.substring(1));
+			const register = strictParseInt(name.substring(1));
 			if (isNaN(register) || register < 0 || register > 15) return undefined; // If the register does not exist, the variable does not exist
 			value = frame.registers[register];
 			attributes = register === 0 ? ["constant", "readOnly"] : undefined;
 			numChildren = 5; // hex, binary, signed, unsigned, decompiled
 		} else if (name.startsWith('addr_')) {
 			// The variable is a memory address
-			const address = parseInt(name.substring('addr_'.length));
+			const address = strictParseInt(name.substring('addr_'.length));
 			if (isNaN(address) || address < 0 || address > 255) return undefined; // If the memory address does not exist, the variable does not exist
 			value = frame.memory[address];
 			numChildren = 6; // hex, binary, signed, unsigned, decompiled, modified
@@ -936,8 +936,8 @@ export class HMMMDebugSession extends DebugSession {
 				numChildren = 0;
 			} else if (format === "modified") {
 				displayName = "Modified";
-				const address = name.startsWith("addr_") ? parseInt(name.substring("addr_".length)) : NaN;
-				stringValue = isNaN(address) ? "unknown" : frame.modifiedMemory.has(parseInt(name.substring("addr_".length))).toString();
+				const address = name.startsWith("addr_") ? strictParseInt(name.substring("addr_".length)) : NaN;
+				stringValue = isNaN(address) ? "unknown" : frame.modifiedMemory.has(strictParseInt(name.substring("addr_".length))).toString();
 				// We don't support setting the modified value, so we can make it read-only
 				attributes = HMMMDebugSession.withReadOnly(attributes);
 				numChildren = 0;
@@ -987,7 +987,7 @@ export class HMMMDebugSession extends DebugSession {
 		name = name.toLowerCase();
 
 		// If the name is a number, assume it refers to a memory address
-		if (!isNaN(parseInt(name))) name = `addr_${name}`;
+		if (!isNaN(strictParseInt(name))) name = `addr_${name}`;
 
 		// Remove underscores and whitespace from the new value
 		value = value.toLowerCase().replace(/[_\s]/g, "");
@@ -999,24 +999,24 @@ export class HMMMDebugSession extends DebugSession {
 		let detectedFormat: string | undefined = undefined;
 		if (value.startsWith("0x")) {
 			// If the value starts with "0x", assume it is a hex number
-			newValue = parseInt(value.substring(2), 16);
+			newValue = strictParseInt(value.substring(2), 16);
 			detectedFormat = "hex";
 		} else if (/[a-f]/.test(value)) {
 			// If the value contains a letter, assume it is a hex number
-			newValue = parseInt(value, 16);
+			newValue = strictParseInt(value, 16);
 			detectedFormat = "hex";
 		} else if (value.startsWith("0b")) {
 			// If the value starts with "0b", assume it is a binary number
-			newValue = parseInt(value.substring(2), 2);
+			newValue = strictParseInt(value.substring(2), 2);
 			detectedFormat = "binary";
 		} else if (value.length > 6 && /^[01]+$/.test(value)) {
 			// If the value is a binary number with more than 6 digits, assume it is a binary number
 			// (base-10 and hex numbers larger than 6 digits cannot be stored in HMMM registers/memory)
-			newValue = parseInt(value, 2);
+			newValue = strictParseInt(value, 2);
 			detectedFormat = "binary";
 		} else if (value.startsWith("-")) {
 			// If the value starts with "-", assume it is a signed number
-			newValue = parseInt(value, 10);
+			newValue = strictParseInt(value, 10);
 			detectedFormat = "signed";
 		}
 
@@ -1026,15 +1026,15 @@ export class HMMMDebugSession extends DebugSession {
 		// If the value is still unknown, attempt to parse it with the requested format
 		if (format && !newValue) {
 			switch (format) {
-				case "hex": newValue = parseInt(value, 16); break;
-				case "binary": newValue = parseInt(value, 2); break;
+				case "hex": newValue = strictParseInt(value, 16); break;
+				case "binary": newValue = strictParseInt(value, 2); break;
 				case "signed":
-				case "unsigned": newValue = parseInt(value, 10); break;
+				case "unsigned": newValue = strictParseInt(value, 10); break;
 			}
 		}
 
 		// If the value is still unknown, attempt to parse it as a base-10 number
-		if (!newValue) newValue = parseInt(value, 10);
+		if (!newValue) newValue = strictParseInt(value, 10);
 
 		// If all of the above failed, we can't parse the value
 		if (isNaN(newValue)) return;
@@ -1042,13 +1042,13 @@ export class HMMMDebugSession extends DebugSession {
 		// Now that we know the new Value, attempt to parse the name
 		if (name.startsWith('r')) {
 			// If the name is a register, check that the register is valid
-			const register = parseInt(name.substring(1));
+			const register = strictParseInt(name.substring(1));
 			if (isNaN(register) || register < 0 || register > 15) return;
 			// If so, set the register to the new value
 			this._runtime.setRegister(register, newValue);
 		} else if (name.startsWith('addr_')) {
 			// If the name is a memory address, check that the address is valid
-			const address = parseInt(name.substring('addr_'.length));
+			const address = strictParseInt(name.substring('addr_'.length));
 			if (isNaN(address) || address < 0 || address > 255) return;
 			// If so, set the memory address to the new value
 			this._runtime.setMemory(address, newValue);

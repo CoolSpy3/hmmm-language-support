@@ -11,7 +11,8 @@ import {
 	compile,
 	decompileInstruction,
 	parseBinaryInstruction,
-	preprocessLine
+	preprocessLine,
+	strictParseInt
 } from '../../hmmm-spec/out/hmmm';
 import { sliceWithCount } from './debugadapter';
 
@@ -445,7 +446,7 @@ export class HMMMRuntime extends EventEmitter {
 				this._sourceToInstructionMap.set(i, this._numInstructions);
 			}
 
-			const encodedInstruction = parseInt(line.replaceAll(/\s/g, ''), 2);
+			const encodedInstruction = strictParseInt(line.replaceAll(/\s/g, ''), 2);
 
 			// If the line is not a valid binary instruction, return false (compilation failed)
 			if (isNaN(encodedInstruction)) return false;
@@ -579,7 +580,7 @@ export class HMMMRuntime extends EventEmitter {
 				return;
 			case "read":
 				oldData = this._registers[rX!];
-				const input = parseInt(await window.showInputBox(<InputBoxOptions>{
+				const input = strictParseInt(await window.showInputBox(<InputBoxOptions>{
 					placeHolder: `Enter a number to store into r${rX}`,
 					prompt: `You can also type any non-numerical text to terminate the program.`,
 					title: `HMMM: ${this.instructionPointer} ${decompileInstruction(instruction)}`

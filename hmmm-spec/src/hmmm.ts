@@ -102,7 +102,7 @@ export function validateOperand(operand: string | undefined): HMMMDetectedOperan
     }
 
     // Test if the argument is a number
-    const num = parseInt(operand);
+    const num = strictParseInt(operand);
 
     if (isNaN(num)) return undefined; // Not a number
 
@@ -229,7 +229,7 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
 
         if (instruction.length !== 16) return undefined; // Invalid instruction! It should be 16 bits long
 
-        opcode = parseInt(instruction, 2);
+        opcode = strictParseInt(instruction, 2);
         line = instruction;
     } else {
         opcode = instruction;
@@ -255,11 +255,11 @@ export function parseBinaryInstruction(instruction: string | number): ParsedHMMM
     function parseOperand(operandType: HMMMOperandType, operand: string): ParsedHMMMOperand {
         switch (operandType) {
             case 'register':
-                return { type: 'register', value: parseInt(operand, 2) };
+                return { type: 'register', value: strictParseInt(operand, 2) };
             case 'signed_number':
                 return { type: 'signed_number', value: parseSignedInt(line.substring(8, 16)) };
             case 'unsigned_number':
-                return { type: 'unsigned_number', value: parseInt(line.substring(8, 16), 2) };
+                return { type: 'unsigned_number', value: strictParseInt(line.substring(8, 16), 2) };
         }
     }
 
@@ -329,7 +329,7 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
 
         lineMap.set(numCodeLines, i);
 
-        if (parseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
+        if (strictParseInt(m[InstructionPart.LINE_NUM]) !== numCodeLines) return undefined; // Invalid line number!
 
         numCodeLines++;
 
@@ -347,13 +347,13 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
             switch(operandType) {
                 case 'register':
                     if (!(operand === 'r0' || operand === 'register')) return undefined; // Invalid operand!
-                    return parseInt(stringValue!.slice(1)) << positionShift;
+                    return strictParseInt(stringValue!.slice(1)) << positionShift;
                 case 'signed_number':
                     if (!(operand === 'signed_number' || operand === 'number')) return undefined; // Invalid operand!
-                    return parseInt(stringValue!) & 0b1111_1111;
+                    return strictParseInt(stringValue!) & 0b1111_1111;
                 case 'unsigned_number':
                     if (!(operand === 'unsigned_number' || operand === 'number')) return undefined; // Invalid operand!
-                    return parseInt(stringValue!) & 0b1111_1111;
+                    return strictParseInt(stringValue!) & 0b1111_1111;
             }
         }
 
@@ -393,6 +393,13 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
     return [compiledCode, lineMap];
 }
 
+export function strictParseInt(value: string | undefined, radix?: number): number {
+    if(value === undefined) return NaN;
+    value = value.trim();
+    if(/^-?\d+$/.test(value)) return parseInt(value, radix);
+    return NaN;
+}
+
 //--helper functions
 
 /**
@@ -402,8 +409,8 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
  */
 function parseSignedInt(value: string): number {
     if (value[0] === '1') { // Negative number
-        return parseInt(value.slice(1), 2) - 2 ** (value.length - 1);
+        return strictParseInt(value.slice(1), 2) - 2 ** (value.length - 1);
     } else { // Positive number
-        return parseInt(value, 2);
+        return strictParseInt(value, 2);
     }
 }
