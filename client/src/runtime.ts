@@ -6,11 +6,11 @@ import { EventEmitter } from 'events';
 import { readFileSync } from 'fs';
 import { InputBoxOptions, window, workspace } from 'vscode';
 import {
-	ParsedHMMMInstruction,
+	ParsedHMMMInstructionComponents,
 	binaryRegex,
 	compile,
+	componentsOf,
 	decompileInstruction,
-	parseBinaryInstruction,
 	preprocessLine,
 	strictParseInt
 } from '../../hmmm-spec/out/hmmm';
@@ -552,7 +552,7 @@ export class HMMMRuntime extends EventEmitter {
 		if (this.checkInstructionExecutionAccess()) return;
 
 		// Read and parse the instruction from memory
-		const parsedInstruction = this.getCurrentInstruction();
+		const parsedInstruction = this.getInstructionComponents();
 
 		// If the instruction is invalid, throw an exception
 		if (!parsedInstruction) {
@@ -746,7 +746,7 @@ export class HMMMRuntime extends EventEmitter {
 		this.instructionPointer = instructionInfo.address;
 
 		// Attempt to read and parse the instruction from memory
-		const parsedInstruction = this.getCurrentInstruction();
+		const parsedInstruction = this.getInstructionComponents();
 
 		// If the instruction is invalid, throw an exception (this should never happen because we should've successfully executed the instruction before)
 		// For this same reason, we omit the instruction execution access check
@@ -755,7 +755,7 @@ export class HMMMRuntime extends EventEmitter {
 			return;
 		}
 
-		const [_binaryInstruction, instruction, rX, rY, _rZ, N] = this.getCurrentInstruction()!;
+		const [_binaryInstruction, instruction, rX, rY, _rZ, N] = parsedInstruction;
 
 		// If the instruction created a stack frame, remove it
 		if (instructionInfo.didCreateStackFrame) {
@@ -852,11 +852,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param startFrame The index of the first frame to return. If not specified, 0 is used
 	 * @param levels The maximum number of frames to return. If not specified, all frames are returned
 	 */
-	public getStack(startFrame: number | undefined, levels: number | undefined): DebugProtocol.StackTraceResponse["body"] {
-		// Populate startFrame and levels with default values if they are not specified
-		startFrame = startFrame ?? 0;
-		levels = levels ?? this._stack.length + 1;
-
+	public getStack(startFrame: number = 0, levels: number = this._stack.length + 1): DebugProtocol.StackTraceResponse["body"] {
 		// Because the 0th frame is the top of the stack (the current instruction), it is not part of this._stack, so
 		// when we slice this._stack, we need to start at startFrame - 1
 		const sliceStart = Math.max(startFrame - 1, 0);
@@ -1117,10 +1113,10 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param endLine The last line to check (inclusive)
 	 * @returns The line numbers of all source lines in the given range that correspond to valid instructions
 	 */
-	public getValidInstructionLocations(startLine?: number, endLine?: number): number[] {
-		// Populate startLine and endLine with default values if they are not specified
-		startLine = Math.max(startLine ?? 0, 0);
-		endLine = endLine ? Math.min(endLine, this._sourceLines.length - 1) : startLine;
+	public getValidInstructionLocations(startLine: number = 0, endLine: number = startLine): number[] {
+		// Cap the range to the bounds of the source file
+		startLine = Math.max(startLine, 0);
+		endLine = Math.min(endLine, this._sourceLines.length - 1);
 
 		const validLines: number[] = [];
 
@@ -1158,52 +1154,19 @@ export class HMMMRuntime extends EventEmitter {
 	}
 
 	/**
-	 * Attempt to parse the instruction at the given memory address
-	 * @param address The address of the instruction to parse. If this value is out of range, undefined is returned
-	 * @returns Undefined if the instruction is invalid, or a tuple containing, in order,
-	 * 		1. the numerical value of the compiled instruction,
-	 * 		2. A ParsedHMMMInstruction object
-	 * 		3. The register identified by the second nibble (4 bit set) (first operand) of the instruction or undefined if the instruction does not have a register as its first argument
-	 * 		4. The register identified by the third nibble (second operand) of the instruction or undefined if the instruction does not have a register as its second argument
-	 * 		5. The register identified by the fourth nibble (third operand) of the instruction or undefined if the instruction does not have a register as its third argument
-	 * 		6. The numerical value (correctly parsed as either signed or unsigned) of the first/second argument of the instruction or undefined if the instruction does not have a numerical value as an argument
+	 * Attempt to break the instruction at the given memory address into its components
+	 * @param address The address of the instruction to parse. If this value is out of range, undefined is returned.
+	 * 		If this value is undefined, the instruction at the current instruction pointer is parsed
+	 * @returns The components of the instruction, or undefined if the instruction is invalid
 	 */
-	public parseInstructionAt(address: number): [number, ParsedHMMMInstruction, number | undefined, number | undefined, number | undefined, number | undefined] | undefined {
+	public getInstructionComponents(address: number = this.instructionPointer): ParsedHMMMInstructionComponents | undefined {
 		// If the address is out of range, return undefined
 		if(address < 0 || address > 255) return undefined;
 
 		// Attempt to read and parse the instruction from memory
 		const binaryInstruction = this._memory[address];
-		const instruction = parseBinaryInstruction(binaryInstruction);
 
-		// If the instruction is invalid, return undefined
-		if (!instruction) return undefined;
-
-		// By default, all arguments to the instruction are undefined
-		let rX: number | undefined = undefined;
-		let rY: number | undefined = undefined;
-		let rZ: number | undefined = undefined;
-		let N: number | undefined = undefined;
-
-		// Retrieve the values from the ParsedHMMMInstruction and store them in the appropriate variables based on their type
-
-		if (instruction.instruction.operand1 === 'register') rX = instruction.operands[0].value;
-		if (instruction.instruction.operand2 === 'register') rY = instruction.operands[1].value;
-		if (instruction.instruction.operand3 === 'register') rZ = instruction.operands[2].value;
-
-		if (instruction.instruction.operand1 === 'signed_number' || instruction.instruction.operand1 === 'unsigned_number') N = instruction.operands[0].value;
-		if (instruction.instruction.operand2 === 'signed_number' || instruction.instruction.operand2 === 'unsigned_number') N = instruction.operands[1].value;
-
-		// Return the parsed instruction
-		return [binaryInstruction, instruction, rX, rY, rZ, N];
-	}
-
-	/**
-	 * Retrieves and parses the instruction that is currently being executed. This is equivalent to calling parseInstructionAt(instructionPointer)
-	 * @returns The parsed instruction, or undefined if the instruction is invalid. (See parseInstructionAt for more information)
-	 */
-	public getCurrentInstruction(): [number, ParsedHMMMInstruction, number | undefined, number | undefined, number | undefined, number | undefined] | undefined {
-		return this.parseInstructionAt(this.instructionPointer);
+		return componentsOf(binaryInstruction);
 	}
 
 	//#endregion
@@ -1216,7 +1179,7 @@ export class HMMMRuntime extends EventEmitter {
 	 */
 	private determineAccesses(): StateAccess[] {
 		// Attempt to read and parse the instruction from memory
-		const parsedInstruction = this.getCurrentInstruction();
+		const parsedInstruction = this.getInstructionComponents();
 
 		// If we failed to parse the instruction, we can't determine the accesses, so return an empty array
 		if (!parsedInstruction) return [];

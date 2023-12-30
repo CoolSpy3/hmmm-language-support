@@ -40,8 +40,8 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
  * @param count The number of elements to slice or undefined to slice to the end of the array
  * @returns The sliced array
  */
-export function sliceWithCount<T>(array: T[], start?: number, count?: number): T[] {
-	return array.slice(start, (start ?? 0) + (count ?? array.length));
+export function sliceWithCount<T>(array: T[], start: number = 0, count: number = array.length): T[] {
+	return array.slice(start, start + count);
 }
 
 /**
@@ -862,9 +862,7 @@ export class HMMMDebugSession extends DebugSession {
 	 * 		the variable will have sub-variables for each format interpretation). (This supersedes the hex argument)
 	 * @returns The variable if it was retrieved successfully, otherwise undefined
 	 */
-	private getVariable(name: string, stackFrame?: number, hex?: boolean, format?: string): DebugProtocol.Variable | undefined {
-		// Set the stack frame to the topmost stack frame if it was omitted
-		stackFrame = stackFrame ?? -1;
+	private getVariable(name: string, stackFrame: number = -1, hex?: boolean, format?: string): DebugProtocol.Variable | undefined {
 		// Convert the name to lowercase for easier comparison
 		name = name.toLowerCase();
 
@@ -976,10 +974,7 @@ export class HMMMDebugSession extends DebugSession {
 	 *                   (Because the runtime does not support setting variables in non-top stack frames, values of stackFrame !== -1 will cause this function to do nothing)
 	 * @param format The format interpretation of the variable to set (if omitted, the function will attempt to detect the format, falling back on base-10 if it cannot)
 	 */
-	private setVariable(name: string, value: string, stackFrame?: number, format?: string): void {
-		// Set the stack frame to the topmost stack frame if it was omitted
-		stackFrame = stackFrame ?? -1;
-
+	private setVariable(name: string, value: string, stackFrame: number = -1, format?: string): void {
 		// If the variable is not in the topmost stack frame, we can't set it
 		if (stackFrame !== -1) return;
 
