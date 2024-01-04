@@ -31,6 +31,7 @@ import {
 	InstructionPart,
 	getInstructionByName,
 	instructionRegex,
+	isJumpInstruction,
 	preprocessLine,
 	strictParseInt,
 	validateOperand
@@ -81,7 +82,7 @@ documents.onDidChangeContent(change => {
 });
 
 // Keep track of error causes, so we can suggest fixes
-type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'invalid_operand_type' | 'missing_operand' | 'too_many_operands';
+type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'invalid_operand_type' | 'missing_operand' | 'too_many_operands' | 'jump_outside_cs';
 
 /**
  * Validates a text document and sends diagnostics to the client
@@ -106,6 +107,10 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
 	// Keep track of the number of lines that contain code so we can check if the line numbers are correct
 	let numCodeLines = 0;
+
+	// Keep track of all jump destinations, so we can check if they're in the code segment
+	// Array of [destination address, range of the argument that contains the destination address in the source file (so we can highlight it)]
+	let jumpDestinations: Array<[number, Range]> = []
 
 	for (let lineIdx = 0; lineIdx < textDocument.lineCount; lineIdx++) {
 		// Get the line and remove any comments
@@ -301,6 +306,11 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 									source: 'HMMM Language Server',
 									data: 'invalid_operand_type'
 								});
+							} else if(isJumpInstruction(instruction.name)) {
+								// The instruction is a jump or call instruction, so add the destination to the
+								// list of jump destinations so we can check if it's in the code segment later
+								// Jump destinations are always unsigned numbers
+								jumpDestinations.push([strictParseInt(operand), Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1])]);
 							}
 							break;
 					}
@@ -331,6 +341,18 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 		if (reportOperandTypeMismatchErrors(operand2, operand2Type, InstructionPart.OPERAND2, hmmmInstruction, hmmmInstruction.operand2)) continue;
 		if (reportOperandTypeMismatchErrors(operand3, operand3Type, InstructionPart.OPERAND3, hmmmInstruction, hmmmInstruction.operand3)) continue;
 
+	}
+
+	for(const [destination, range] of jumpDestinations) {
+		if(destination >= numCodeLines) {
+			diagnostics.push({
+				severity: DiagnosticSeverity.Warning,
+				range,
+				message: `Jump destination is outside code segment`,
+				source: 'HMMM Language Server',
+				data: 'jump_outside_cs'
+			});
+		}
 	}
 
 	// Send the diagnostics to the client
@@ -543,7 +565,7 @@ connection.onDefinition(
 
 		const instruction = m[InstructionPart.INSTRUCTION];
 
-		if (!(instruction.toLowerCase().startsWith('j') || instruction.toLowerCase().startsWith('call'))) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
+		if (!isJumpInstruction(instruction)) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
 
 		// Assume the number represents a line number that is being jumped to. Return all lines with a matching instruction number
 
@@ -846,7 +868,7 @@ connection.onReferences(
 			}
 
 			// Check if the instruction is a jump or call
-			if (!m[InstructionPart.INSTRUCTION] || !(m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('j') || m[InstructionPart.INSTRUCTION].toLowerCase().startsWith('call'))) continue; // It's not :(
+			if (!isJumpInstruction(m[InstructionPart.INSTRUCTION])) continue; // It's not :(
 
 			// If it is, check if either of the operands are the line number
 			if (m[InstructionPart.OPERAND1]) {

@@ -37,6 +37,8 @@ A full list of errors and fixes that the extension can provide is listed below:
 	* *Quick Fix*: Remove the extra operand(s) from the instruction.
 * Unexpected Token - The extension encountered more tokens than should be on a line (more than 3 instruction arguments).
 	* *Quick Fix*: Remove the extra token(s) from the line.
+* Jump destination is outside of code segment (*warning*) - The extension encountered a jump or call instruction which jumps to a line outside of the code segment. For most HMMM code, this is an error, but there are some cases (in self-modifying code) where this is intentional.
+	* *No quick fixes provided*
 
 #### Code Completion
 The extension provides code completion for HMMM assembly files. This includes code completion for line numbers, instructions, and registers. Additionally, the extension will provide information about each instruction when it is selected in the code completion list.

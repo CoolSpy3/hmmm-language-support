@@ -261,6 +261,14 @@ export function preprocessLine(line: string) {
 	return line.split('#')[0].trimEnd();
 }
 
+/**
+ * Determines if a HMMM instruction is a jump or call instruction (jumpr, jumpn, calln, etc.)
+ */
+export function isJumpInstruction(instr?: string): boolean {
+	if(!instr) return false;
+	return instr.startsWith('j') || instr.startsWith('call');
+}
+
 //#endregion
 
 //#region Binary
