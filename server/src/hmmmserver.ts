@@ -541,7 +541,7 @@ connection.onDefinition(
 
 		const instruction = m[InstructionPart.INSTRUCTION];
 
-		if (!(instruction.toLowerCase().startsWith("j") || instruction.toLowerCase().startsWith("call"))) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
+		if (!(instruction.toLowerCase().startsWith('j') || instruction.toLowerCase().startsWith('call'))) return []; // The instruction is not a jump or call; the numbers are meaningless, so don't return anything
 
 		// Assume the number represents a line number that is being jumped to. Return all lines with a matching instruction number
 

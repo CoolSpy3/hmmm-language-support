@@ -128,7 +128,7 @@ export class HMMMDebugSession extends DebugSession {
 	 */
 	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
 		// A reference to the debugging settings configured for the extension
-		const debuggingSettings = workspace.getConfiguration("hmmm.debugging");
+		const debuggingSettings = workspace.getConfiguration('hmmm.debugging');
 
 		// Define the capabilities object if it doesn't exist
 		response.body = response.body ?? {};
@@ -138,7 +138,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		// Execution Capabilities
 		response.body.supportsGotoTargetsRequest = true;
-		response.body.supportsStepBack = debuggingSettings.get("enableReverseExecution", false);
+		response.body.supportsStepBack = debuggingSettings.get('enableReverseExecution', false);
 
 		// Breakpoint Capabilities
 		response.body.supportsDataBreakpoints = true;
@@ -154,34 +154,34 @@ export class HMMMDebugSession extends DebugSession {
 		response.body.supportsExceptionInfoRequest = true;
 		response.body.exceptionBreakpointFilters = [
 			{
-				filter: "invalid-instruction",
-				label: "Invalid Instruction",
+				filter: 'invalid-instruction',
+				label: 'Invalid Instruction',
 				default: true,
-				description: "Breaks if the program attempts to execute a memory address that does not contain a valid instruction."
+				description: 'Breaks if the program attempts to execute a memory address that does not contain a valid instruction.'
 			},
 			{
-				filter: "invalid-memory-access",
-				label: "Invalid Memory Access",
+				filter: 'invalid-memory-access',
+				label: 'Invalid Memory Access',
 				default: true,
-				description: "Breaks if the program attempts to access a memory address that does not exist."
+				description: 'Breaks if the program attempts to access a memory address that does not exist.'
 			},
 			{
-				filter: "cs-read",
-				label: "Code Segment Read",
+				filter: 'cs-read',
+				label: 'Code Segment Read',
 				default: false,
-				description: "Breaks if the program attempts to read from an address inside the code segment."
+				description: 'Breaks if the program attempts to read from an address inside the code segment.'
 			},
 			{
-				filter: "cs-write",
-				label: "Code Segment Write",
+				filter: 'cs-write',
+				label: 'Code Segment Write',
 				default: true,
-				description: "Breaks if the program attempts to overwrite an instruction in memory."
+				description: 'Breaks if the program attempts to overwrite an instruction in memory.'
 			},
 			{
-				filter: "execute-outside-cs",
-				label: "Execute Outside Code Segment",
+				filter: 'execute-outside-cs',
+				label: 'Execute Outside Code Segment',
 				default: true,
-				description: "Breaks if the program attempts to execute an instruction outside of the code segment."
+				description: 'Breaks if the program attempts to execute an instruction outside of the code segment.'
 			}
 		];
 
@@ -212,9 +212,9 @@ export class HMMMDebugSession extends DebugSession {
 		this._source = this.createSource(program);
 
 		// Attempt to configure the runtime for the program
-		if (!this._runtime.configure(program, args.isBinary ? "hb" : "hmmm")) {
+		if (!this._runtime.configure(program, args.isBinary ? 'hb' : 'hmmm')) {
 			// The runtime failed to configure due to a build error
-			this.sendErrorResponse(response, 1, "Program contains errors! Please fix them before debugging.", undefined, ErrorDestination.User);
+			this.sendErrorResponse(response, 1, 'Program contains errors! Please fix them before debugging.', undefined, ErrorDestination.User);
 			return;
 		}
 
@@ -432,7 +432,7 @@ export class HMMMDebugSession extends DebugSession {
 		// By default, we can't set a data breakpoint on the variable
 		response.body = {
 			dataId: null,
-			description: "Data breakpoints can only be set on memory addresses and general purpose registers."
+			description: 'Data breakpoints can only be set on memory addresses and general purpose registers.'
 		};
 
 		/**
@@ -461,12 +461,12 @@ export class HMMMDebugSession extends DebugSession {
 		}
 
 		// Check if the variable is a register or memory address (besides r0)
-		if (/^(r\d+|addr_\d+)$/.test(name) && name !== "r0") {
+		if (/^(r\d+|addr_\d+)$/.test(name) && name !== 'r0') {
 			// If so, we can set a data breakpoint on it
 			response.body = {
 				dataId: name, // Make the dataId the name of the register/memory address so that we can use it to easily identify the register/memory address later without having to use some kind of lookup table
-				description: name.startsWith("addr_") ? `Memory Address ${name.substring("addr_".length)}` : `Register ${name.substring(1)}`,
-				accessTypes: ["read", "write", "readWrite"],
+				description: name.startsWith('addr_') ? `Memory Address ${name.substring('addr_'.length)}` : `Register ${name.substring(1)}`,
+				accessTypes: ['read', 'write', 'readWrite'],
 				canPersist: true
 			};
 		}
@@ -485,14 +485,14 @@ export class HMMMDebugSession extends DebugSession {
 			// Attempt to map each requested breakpoint to a data breakpoint
 			breakpoints: args.breakpoints.map(bp => {
 				// Check that the breakpoint refers to a valid data location
-				if (/^(r\d+|addr_\d+)$/.test(bp.dataId) && bp.dataId !== "r0") {
+				if (/^(r\d+|addr_\d+)$/.test(bp.dataId) && bp.dataId !== 'r0') {
 					// Parse the requested access type to determine which types of breakpoints to set
-					const onRead = bp.accessType === "read" || bp.accessType === "readWrite";
-					const onWrite = bp.accessType === "write" || bp.accessType === "readWrite";
+					const onRead = bp.accessType === 'read' || bp.accessType === 'readWrite';
+					const onWrite = bp.accessType === 'write' || bp.accessType === 'readWrite';
 
-					if (bp.dataId.startsWith("addr_")) {
+					if (bp.dataId.startsWith('addr_')) {
 						// If the breakpoint refers to a memory address check that the address is valid
-						const address = strictParseInt(bp.dataId.substring("addr_".length));
+						const address = strictParseInt(bp.dataId.substring('addr_'.length));
 						if (isNaN(address) || address < 0 || address > 255) {
 							// If not, return a breakpoint with verified = false and a message explaining why
 							return <DebugProtocol.Breakpoint>{
@@ -502,7 +502,7 @@ export class HMMMDebugSession extends DebugSession {
 						}
 						// Otherwise, return a breakpoint with verified = true
 						return <DebugProtocol.Breakpoint>{
-							id: this._runtime.setDataBreakpoint(address, "memory", onRead, onWrite),
+							id: this._runtime.setDataBreakpoint(address, 'memory', onRead, onWrite),
 							verified: true,
 							description: `Memory Address ${address}`
 						}
@@ -518,7 +518,7 @@ export class HMMMDebugSession extends DebugSession {
 						}
 						// Otherwise, return a breakpoint with verified = true
 						return <DebugProtocol.Breakpoint>{
-							id: this._runtime.setDataBreakpoint(register, "register", onRead, onWrite),
+							id: this._runtime.setDataBreakpoint(register, 'register', onRead, onWrite),
 							verified: true,
 							description: `Register ${register}`
 						}
@@ -546,7 +546,7 @@ export class HMMMDebugSession extends DebugSession {
 		// The runtime doesn't support multiple threads, so we can just return a single hardcoded thread
 		response.body = {
 			threads: [
-				new Thread(HMMMDebugSession.THREAD_ID, "main")
+				new Thread(HMMMDebugSession.THREAD_ID, 'main')
 			]
 		};
 		this.sendResponse(response);
@@ -584,15 +584,15 @@ export class HMMMDebugSession extends DebugSession {
 		response.body = {
 			scopes: [
 				{
-					name: "Registers",
-					presentationHint: "registers",
+					name: 'Registers',
+					presentationHint: 'registers',
 					// Create a variable handle which refers to the requested frame's registers
 					variablesReference: this._variableHandles.create(`frame_${args.frameId}.registers`),
 					expensive: false,
 					namedVariables: 18 // 16 registers + pc + ir
 				},
 				{
-					name: "Memory",
+					name: 'Memory',
 					// Create a variable handle which refers to the requested frame's memory
 					variablesReference: this._variableHandles.create(`frame_${args.frameId}.memory`),
 					expensive: false,
@@ -620,14 +620,14 @@ export class HMMMDebugSession extends DebugSession {
 		}
 		const [frame, name, format] = parsedName;
 
-		if (name === "registers" && args.filter !== 'indexed') { // The registers scope does not contain indexed variables
+		if (name === 'registers' && args.filter !== 'indexed') { // The registers scope does not contain indexed variables
 			// If the variable is the registers scope, add all registers to the response
-			response.body.variables.push(this.getVariable("pc", frame, args.format?.hex)!);
-			response.body.variables.push(this.getVariable("ir", frame, args.format?.hex)!);
+			response.body.variables.push(this.getVariable('pc', frame, args.format?.hex)!);
+			response.body.variables.push(this.getVariable('ir', frame, args.format?.hex)!);
 			for (let i = 0; i < 16; i++) {
 				response.body.variables.push(this.getVariable(`r${i}`, frame, args.format?.hex)!);
 			}
-		} else if (name === "memory" && args.filter !== 'named') { // The memory scope does not contain named variables
+		} else if (name === 'memory' && args.filter !== 'named') { // The memory scope does not contain named variables
 			// Add all memory addresses to the response
 
 			// Use the arguments to determine the range of memory addresses to add
@@ -639,7 +639,7 @@ export class HMMMDebugSession extends DebugSession {
 			for (let i = startIdx; i < endIdx; i++) {
 				response.body.variables.push(this.getVariable(`addr_${i}`, frame, args.format?.hex)!);
 			}
-		} else if (name.startsWith("addr_") || name.startsWith("r") && args.filter !== 'indexed') { // Register/memory address variables do not contain indexed sub-variables
+		} else if (name.startsWith('addr_') || name.startsWith('r') && args.filter !== 'indexed') { // Register/memory address variables do not contain indexed sub-variables
 			if (format) {
 				// If the variable is an interpreted value, it has no sub-variables
 				this.sendResponse(response);
@@ -647,13 +647,13 @@ export class HMMMDebugSession extends DebugSession {
 			}
 
 			// If the variable is a register/memory address, add all value interpretations to the response
-			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "hex")!);
-			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "binary")!);
-			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "signed")!);
-			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "unsigned")!);
-			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "decompiled")!);
+			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'hex')!);
+			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'binary')!);
+			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'signed')!);
+			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'unsigned')!);
+			response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'decompiled')!);
 			// Memory addresses also have a "modified" value interpretation
-			if (name.startsWith("addr_")) response.body.variables.push(this.getVariable(name, frame, args.format?.hex, "modified")!);
+			if (name.startsWith('addr_')) response.body.variables.push(this.getVariable(name, frame, args.format?.hex, 'modified')!);
 		}
 
 		// Slice the variables to the requested start and count
@@ -662,7 +662,7 @@ export class HMMMDebugSession extends DebugSession {
 
 		// I did optimize the memory addresses though because there are enough of them that a frontend may decide to filter them, and
 		// because they were already being added in a loop, not much additional code was needed to optimize them
-		if (name !== "memory") response.body.variables = sliceWithCount(response.body.variables, args.start, args.count);
+		if (name !== 'memory') response.body.variables = sliceWithCount(response.body.variables, args.start, args.count);
 		this.sendResponse(response);
 	}
 
@@ -789,7 +789,7 @@ export class HMMMDebugSession extends DebugSession {
 		response.body = {
 			exceptionId,
 			description,
-			breakMode: "always"
+			breakMode: 'always'
 		};
 
 		this.sendResponse(response);
@@ -821,18 +821,18 @@ export class HMMMDebugSession extends DebugSession {
 	 * @returns A tuple containing the frame number, variable name, and format of the variable (if it has one)
 	 */
 	private parseVariableName(name: string, variablesReference?: number): [number | undefined, string, string | undefined] | undefined {
-		if (variablesReference && name.endsWith(" Value")) {
+		if (variablesReference && name.endsWith(' Value')) {
 			// If a variablesReference was provided and the name refers to a value interpretation, try to parse the container as a variable and append the format
 			const container = this.parseVariableName(this._variableHandles.get(variablesReference, ''));
 			if (container) {
-				container[2] = name.substring(0, name.length - " Value".length).toLowerCase();
+				container[2] = name.substring(0, name.length - ' Value'.length).toLowerCase();
 				return container;
 			}
 		}
 
 		// Attempt to parse the frame number
 		let frame: number | undefined = undefined;
-		if (name.startsWith("frame_")) {
+		if (name.startsWith('frame_')) {
 			const indexOfDot = name.indexOf('.');
 			if (indexOfDot >= 0) {
 				// The frame number is the number between "frame_" and the first dot
@@ -877,22 +877,22 @@ export class HMMMDebugSession extends DebugSession {
 		let displayName = name;
 		let value: string | number | undefined = undefined;
 		let numChildren = 0;
-		let attributes: DebugProtocol.VariablePresentationHint["attributes"] = undefined;
+		let attributes: DebugProtocol.VariablePresentationHint['attributes'] = undefined;
 
-		if (name === "pc") {
+		if (name === 'pc') {
 			// The variable is the program counter
 			value = frame.instructionPointer;
-			attributes = ["readOnly"];
-		} else if (name === "ir") {
+			attributes = ['readOnly'];
+		} else if (name === 'ir') {
 			// The variable is the instruction register
-			value = decompileInstruction(frame.memory[frame.instructionPointer]) ?? "invalid instruction";
-			attributes = ["readOnly"];
+			value = decompileInstruction(frame.memory[frame.instructionPointer]) ?? 'invalid instruction';
+			attributes = ['readOnly'];
 		} else if (name.startsWith('r')) {
 			// The variable is a register
 			const register = strictParseInt(name.substring(1));
 			if (isNaN(register) || register < 0 || register > 15) return undefined; // If the register does not exist, the variable does not exist
 			value = frame.registers[register];
-			attributes = register === 0 ? ["constant", "readOnly"] : undefined;
+			attributes = register === 0 ? ['constant', 'readOnly'] : undefined;
 			numChildren = 5; // hex, binary, signed, unsigned, decompiled
 		} else if (name.startsWith('addr_')) {
 			// The variable is a memory address
@@ -907,42 +907,42 @@ export class HMMMDebugSession extends DebugSession {
 
 		// Convert the (possibly numerical) value to a string
 		let stringValue: string | undefined = undefined;
-		if (typeof value === "number") {
+		if (typeof value === 'number') {
 			// If the value is a number, format it according to the format interpretation
 			// If a format interpretation was provided, the value is an interpreted value, so we can set the display name to the format interpretation and numChildren to 0
-			if (format === "hex") {
-				displayName = "Hex Value";
+			if (format === 'hex') {
+				displayName = 'Hex Value';
 				stringValue = HMMMDebugSession.formatValue(value, false, true);
 				numChildren = 0;
-			} else if (format === "binary") {
-				displayName = "Binary Value";
+			} else if (format === 'binary') {
+				displayName = 'Binary Value';
 				stringValue = formatBinaryNumber(value.toString(2));
 				numChildren = 0;
-			} else if (format === "signed") {
-				displayName = "Signed Value";
+			} else if (format === 'signed') {
+				displayName = 'Signed Value';
 				stringValue = HMMMDebugSession.formatValue(value, true, false);
 				numChildren = 0;
-			} else if (format === "unsigned") {
-				displayName = "Unsigned Value";
+			} else if (format === 'unsigned') {
+				displayName = 'Unsigned Value';
 				stringValue = HMMMDebugSession.formatValue(value, false, false);
 				numChildren = 0;
-			} else if (format === "decompiled") {
-				displayName = "Decompiled Instruction";
-				stringValue = decompileInstruction(value) ?? "invalid instruction";
+			} else if (format === 'decompiled') {
+				displayName = 'Decompiled Instruction';
+				stringValue = decompileInstruction(value) ?? 'invalid instruction';
 				// We don't support setting the decompiled value directly, so we can make it read-only
 				attributes = HMMMDebugSession.withReadOnly(attributes);
 				numChildren = 0;
-			} else if (format === "modified") {
-				displayName = "Modified";
-				const address = name.startsWith("addr_") ? strictParseInt(name.substring("addr_".length)) : NaN;
-				stringValue = isNaN(address) ? "unknown" : frame.modifiedMemory.has(strictParseInt(name.substring("addr_".length))).toString();
+			} else if (format === 'modified') {
+				displayName = 'Modified';
+				const address = name.startsWith('addr_') ? strictParseInt(name.substring('addr_'.length)) : NaN;
+				stringValue = isNaN(address) ? 'unknown' : frame.modifiedMemory.has(strictParseInt(name.substring('addr_'.length))).toString();
 				// We don't support setting the modified value, so we can make it read-only
 				attributes = HMMMDebugSession.withReadOnly(attributes);
 				numChildren = 0;
 			} else {
 				// If no format interpretation was provided, interpret it using default format interpretation semantics
 				// (Always print pc as an unsigned base-10 number because it *should* always be in the range 0-255)
-				stringValue = name === "pc" ? value.toString() : HMMMDebugSession.formatValue(value, true, hex);
+				stringValue = name === 'pc' ? value.toString() : HMMMDebugSession.formatValue(value, true, hex);
 			}
 		} else {
 			// If the value is already a string, use it as is
@@ -953,7 +953,7 @@ export class HMMMDebugSession extends DebugSession {
 		if (stackFrame !== -1) attributes = HMMMDebugSession.withReadOnly(attributes);
 
 		// Construct a name that can be used to evaluate the variable
-		const evaluateName = `frame_${stackFrame}.${name}${format ? `.${format}` : ""}`;
+		const evaluateName = `frame_${stackFrame}.${name}${format ? `.${format}` : ''}`;
 
 		return <DebugProtocol.Variable>{
 			name: displayName,
@@ -985,34 +985,34 @@ export class HMMMDebugSession extends DebugSession {
 		if (!isNaN(strictParseInt(name))) name = `addr_${name}`;
 
 		// Remove underscores and whitespace from the new value
-		value = value.toLowerCase().replace(/[_\s]/g, "");
+		value = value.toLowerCase().replace(/[_\s]/g, '');
 
 		// Attempt to detect the format of the new value
 		// For the moment, only attempt to detect unambiguous formats
 		// This way, we can compare it to the requested format to see if its valid
 		let newValue: number | undefined = undefined;
 		let detectedFormat: string | undefined = undefined;
-		if (value.startsWith("0x")) {
-			// If the value starts with "0x", assume it is a hex number
+		if (value.startsWith('0x')) {
+			// If the value starts with '0x', assume it is a hex number
 			newValue = strictParseInt(value.substring(2), 16);
-			detectedFormat = "hex";
+			detectedFormat = 'hex';
 		} else if (/[a-f]/.test(value)) {
 			// If the value contains a letter, assume it is a hex number
 			newValue = strictParseInt(value, 16);
-			detectedFormat = "hex";
-		} else if (value.startsWith("0b")) {
-			// If the value starts with "0b", assume it is a binary number
+			detectedFormat = 'hex';
+		} else if (value.startsWith('0b')) {
+			// If the value starts with '0b', assume it is a binary number
 			newValue = strictParseInt(value.substring(2), 2);
-			detectedFormat = "binary";
+			detectedFormat = 'binary';
 		} else if (value.length > 6 && /^[01]+$/.test(value)) {
 			// If the value is a binary number with more than 6 digits, assume it is a binary number
 			// (base-10 and hex numbers larger than 6 digits cannot be stored in HMMM registers/memory)
 			newValue = strictParseInt(value, 2);
-			detectedFormat = "binary";
-		} else if (value.startsWith("-")) {
-			// If the value starts with "-", assume it is a signed number
+			detectedFormat = 'binary';
+		} else if (value.startsWith('-')) {
+			// If the value starts with '-', assume it is a signed number
 			newValue = strictParseInt(value, 10);
-			detectedFormat = "signed";
+			detectedFormat = 'signed';
 		}
 
 		// If a format was provided and the detected format does not match it, the value is invalid (remember we only detected unambiguous formats)
@@ -1021,10 +1021,10 @@ export class HMMMDebugSession extends DebugSession {
 		// If the value is still unknown, attempt to parse it with the requested format
 		if (format && !newValue) {
 			switch (format) {
-				case "hex": newValue = strictParseInt(value, 16); break;
-				case "binary": newValue = strictParseInt(value, 2); break;
-				case "signed":
-				case "unsigned": newValue = strictParseInt(value, 10); break;
+				case 'hex': newValue = strictParseInt(value, 16); break;
+				case 'binary': newValue = strictParseInt(value, 2); break;
+				case 'signed':
+				case 'unsigned': newValue = strictParseInt(value, 10); break;
 			}
 		}
 
@@ -1050,7 +1050,7 @@ export class HMMMDebugSession extends DebugSession {
 		}
 
 		// If the value was set successfully, invalidate all variables in the stack frame (as far as I can tell, there's no way to only invalidate some variables)
-		this.sendEvent(new InvalidatedEvent(["variables"], HMMMDebugSession.THREAD_ID, stackFrame));
+		this.sendEvent(new InvalidatedEvent(['variables'], HMMMDebugSession.THREAD_ID, stackFrame));
 	}
 
 	/**
@@ -1061,16 +1061,16 @@ export class HMMMDebugSession extends DebugSession {
 	 * @returns The formatted value
 	 */
 	private static formatValue(value: number, signed?: boolean, hex?: boolean): string {
-		return hex ? `0x${value.toString(16).padStart(4, "0")}` : signed ? s16IntToNumber(value).toString() : value.toString();
+		return hex ? `0x${value.toString(16).padStart(4, '0')}` : signed ? s16IntToNumber(value).toString() : value.toString();
 	}
 
 	/**
-	 * Adds the "readOnly" attribute to the provided list of variable attributes.
-	 * @param attributes The attributes to add the "readOnly" attribute to
+	 * Adds the 'readOnly' attribute to the provided list of variable attributes.
+	 * @param attributes The attributes to add the 'readOnly' attribute to
 	 * @returns The new list of attributes
 	 */
-	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint["attributes"]): DebugProtocol.VariablePresentationHint["attributes"] {
-		return attributes ? attributes.concat("readOnly").filter(removeDuplicates) : ["readOnly"];
+	private static withReadOnly(attributes?: DebugProtocol.VariablePresentationHint['attributes']): DebugProtocol.VariablePresentationHint['attributes'] {
+		return attributes ? attributes.concat('readOnly').filter(removeDuplicates) : ['readOnly'];
 	}
 
 	//#endregion
@@ -1088,11 +1088,11 @@ export class HMMMDebugSession extends DebugSession {
 
 	/**
 	 * Checks if the provided file path matches the source file we're debugging.
-	 * @param otherPath The path to check (a value of "undefined" will always return false)
+	 * @param otherPath The path to check (a value of undefined will always return false)
 	 * @returns True if the path matches the source file we're debugging, otherwise false
 	 */
 	private matchesSource(otherPath: string | undefined) {
-		return otherPath && this._source?.path && relative(this._source.path, otherPath) === "";
+		return otherPath && this._source?.path && relative(this._source.path, otherPath) === '';
 	}
 
 	//#endregion

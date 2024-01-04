@@ -87,32 +87,32 @@ export let hmmmInstructions: HMMMInstruction[];
 
 	// Define all instructions. This information is taken from the HMMM specification: https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html
 	hmmmInstructions = [
-		hmmmInstr("halt", 0b0000_0000_0000_0000, undefined, undefined, undefined, "Halt Program!"),
-		hmmmInstr("read", 0b0000_0000_0000_0001, 'register', undefined, undefined, "Stop for user input, which will then be stored in register rX (input is an integer from -32768 to +32767)"),
-		hmmmInstr("write", 0b0000_0000_0000_0010, 'register', undefined, undefined, "Print contents of register rX"),
-		hmmmInstr("jumpr", 0b0000_0000_0000_0011, 'register', undefined, undefined, "Set program counter to address in rX"),
-		hmmmInstr("setn", 0b0001_0000_0000_0000, 'register', 'signed_number', undefined, "Set register rX equal to the integer N (-128 to +127)"),
-		hmmmInstr("loadn", 0b0010_0000_0000_0000, 'register', 'unsigned_number', undefined, "Load register rX with the contents of memory address N"),
-		hmmmInstr("storen", 0b0011_0000_0000_0000, 'register', 'unsigned_number', undefined, "Store contents of register rX into memory address N"),
-		hmmmInstr("loadr", 0b0100_0000_0000_0000, 'register', 'register', undefined, "Load register rX with the contents of memory address N"),
-		hmmmInstr("storer", 0b0100_0000_0000_0001, 'register', 'register', undefined, "Store contents of register rX into memory address held in reg. rY"),
-		hmmmInstr("popr", 0b0100_0000_0000_0010, 'register', 'register', undefined, "Load contents of register rX from stack pointed to by reg. rY"),
-		hmmmInstr("pushr", 0b0100_0000_0000_0011, 'register', 'register', undefined, "Store contents of register rX onto stack pointed to by reg. rY"),
-		hmmmInstr("addn", 0b0101_0000_0000_0000, 'register', 'signed_number', undefined, "Add integer N (-128 to 127) to register rX"),
-		hmmmInstr("nop", 0b0110_0000_0000_0000, undefined, undefined, undefined, "Do nothing"),
-		hmmmInstr("copy", 0b0110_0000_0000_0000, 'register', 'register', undefined, "Set rX = rY"),
-		hmmmInstr("add", 0b0110_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY + rZ"),
-		hmmmInstr("neg", 0b0111_0000_0000_0000, 'register', 'register', undefined, "Set rX = -rY"),
-		hmmmInstr("sub", 0b0111_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY - rZ"),
-		hmmmInstr("mul", 0b1000_0000_0000_0000, 'register', 'register', 'register', "Set rx = rY * rZ"),
-		hmmmInstr("div", 0b1001_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY // rZ (integer division; rounds down; no remainder)"),
-		hmmmInstr("mod", 0b1010_0000_0000_0000, 'register', 'register', 'register', "Set rX = rY % rZ (returns the remainder of integer division)"),
-		hmmmInstr("jumpn", 0b1011_0000_0000_0000, 'unsigned_number', undefined, undefined, "Set program counter to address N"),
-		hmmmInstr("calln", 0b1011_0000_0000_0000, 'register', 'unsigned_number', undefined, "Copy addr. of next instr. into rX and then jump to mem. addr. N"),
-		hmmmInstr("jeqzn", 0b1100_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX == 0, then jump to line N"),
-		hmmmInstr("jnezn", 0b1101_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX != 0, then jump to line N"),
-		hmmmInstr("jgtzn", 0b1110_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX > 0, then jump to line N"),
-		hmmmInstr("jltzn", 0b1111_0000_0000_0000, 'register', 'unsigned_number', undefined, "If rX < 0, then jump to line N"),
+		hmmmInstr('halt', 0b0000_0000_0000_0000, undefined, undefined, undefined, 'Halt Program!'),
+		hmmmInstr('read', 0b0000_0000_0000_0001, 'register', undefined, undefined, 'Stop for user input, which will then be stored in register rX (input is an integer from -32768 to +32767)'),
+		hmmmInstr('write', 0b0000_0000_0000_0010, 'register', undefined, undefined, 'Print contents of register rX'),
+		hmmmInstr('jumpr', 0b0000_0000_0000_0011, 'register', undefined, undefined, 'Set program counter to address in rX'),
+		hmmmInstr('setn', 0b0001_0000_0000_0000, 'register', 'signed_number', undefined, 'Set register rX equal to the integer N (-128 to +127)'),
+		hmmmInstr('loadn', 0b0010_0000_0000_0000, 'register', 'unsigned_number', undefined, 'Load register rX with the contents of memory address N'),
+		hmmmInstr('storen', 0b0011_0000_0000_0000, 'register', 'unsigned_number', undefined, 'Store contents of register rX into memory address N'),
+		hmmmInstr('loadr', 0b0100_0000_0000_0000, 'register', 'register', undefined, 'Load register rX with the contents of memory address N'),
+		hmmmInstr('storer', 0b0100_0000_0000_0001, 'register', 'register', undefined, 'Store contents of register rX into memory address held in reg. rY'),
+		hmmmInstr('popr', 0b0100_0000_0000_0010, 'register', 'register', undefined, 'Load contents of register rX from stack pointed to by reg. rY'),
+		hmmmInstr('pushr', 0b0100_0000_0000_0011, 'register', 'register', undefined, 'Store contents of register rX onto stack pointed to by reg. rY'),
+		hmmmInstr('addn', 0b0101_0000_0000_0000, 'register', 'signed_number', undefined, 'Add integer N (-128 to 127) to register rX'),
+		hmmmInstr('nop', 0b0110_0000_0000_0000, undefined, undefined, undefined, 'Do nothing'),
+		hmmmInstr('copy', 0b0110_0000_0000_0000, 'register', 'register', undefined, 'Set rX = rY'),
+		hmmmInstr('add', 0b0110_0000_0000_0000, 'register', 'register', 'register', 'Set rX = rY + rZ'),
+		hmmmInstr('neg', 0b0111_0000_0000_0000, 'register', 'register', undefined, 'Set rX = -rY'),
+		hmmmInstr('sub', 0b0111_0000_0000_0000, 'register', 'register', 'register', 'Set rX = rY - rZ'),
+		hmmmInstr('mul', 0b1000_0000_0000_0000, 'register', 'register', 'register', 'Set rx = rY * rZ'),
+		hmmmInstr('div', 0b1001_0000_0000_0000, 'register', 'register', 'register', 'Set rX = rY // rZ (integer division; rounds down; no remainder)'),
+		hmmmInstr('mod', 0b1010_0000_0000_0000, 'register', 'register', 'register', 'Set rX = rY % rZ (returns the remainder of integer division)'),
+		hmmmInstr('jumpn', 0b1011_0000_0000_0000, 'unsigned_number', undefined, undefined, 'Set program counter to address N'),
+		hmmmInstr('calln', 0b1011_0000_0000_0000, 'register', 'unsigned_number', undefined, 'Copy addr. of next instr. into rX and then jump to mem. addr. N'),
+		hmmmInstr('jeqzn', 0b1100_0000_0000_0000, 'register', 'unsigned_number', undefined, 'If rX == 0, then jump to line N'),
+		hmmmInstr('jnezn', 0b1101_0000_0000_0000, 'register', 'unsigned_number', undefined, 'If rX != 0, then jump to line N'),
+		hmmmInstr('jgtzn', 0b1110_0000_0000_0000, 'register', 'unsigned_number', undefined, 'If rX > 0, then jump to line N'),
+		hmmmInstr('jltzn', 0b1111_0000_0000_0000, 'register', 'unsigned_number', undefined, 'If rX < 0, then jump to line N'),
 	];
 }
 
@@ -121,17 +121,17 @@ export let hmmmInstructions: HMMMInstruction[];
  * This map contains the aliases that are defined in the HMMM specification: https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html
  */
 export let hmmmAliases = new Map<string, string>([
-	["mov", "copy"],
-	["jump", "jumpr"],
-	["jeqz", "jeqzn"],
-	["jnez", "jnezn"],
-	["jgtz", "jgtzn"],
-	["jltz", "jltzn"],
-	["call", "calln"],
-	["loadi", "loadr"],
-	["load", "loadr"],
-	["storei", "storer"],
-	["store", "storer"]
+	['mov', 'copy'],
+	['jump', 'jumpr'],
+	['jeqz', 'jeqzn'],
+	['jnez', 'jnezn'],
+	['jgtz', 'jgtzn'],
+	['jltz', 'jltzn'],
+	['call', 'calln'],
+	['loadi', 'loadr'],
+	['load', 'loadr'],
+	['storei', 'storer'],
+	['store', 'storer']
 ]);
 
 /**
@@ -276,7 +276,7 @@ export const binaryRegex = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d;
  * @returns The formatted binary number
  */
 export function formatBinaryNumber(line: string): string {
-	return line.padStart(16, '0').replace(binaryRegex, "$1 $2 $3 $4");
+	return line.padStart(16, '0').replace(binaryRegex, '$1 $2 $3 $4');
 }
 
 //#endregion

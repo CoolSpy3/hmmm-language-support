@@ -76,11 +76,11 @@ interface StateAccess {
 	/**
 	 * Whether the address refers to a register or memory address
 	 */
-	dataType: "register" | "memory";
+	dataType: 'register' | 'memory';
 	/**
 	 * The type of access (read or write)
 	 */
-	accessType: "read" | "write";
+	accessType: 'read' | 'write';
 }
 
 /**
@@ -105,7 +105,7 @@ export class HMMMRuntime extends EventEmitter {
 	/**
 	 * The language of the source file (binary or assembly)
 	 */
-	private _language: "hb" | "hmmm" | undefined = undefined;
+	private _language: 'hb' | 'hmmm' | undefined = undefined;
 
 	/**
 	 * The source code of the program
@@ -310,12 +310,12 @@ export class HMMMRuntime extends EventEmitter {
 	/**
 	 * The id of the last exception that was hit
 	 */
-	private _exception: string = "";
+	private _exception: string = '';
 
 	/**
 	 * The description of the last exception that was hit
 	 */
-	private _exceptionDescription: string = "";
+	private _exceptionDescription: string = '';
 
 	/**
 	 * Retrieves information about the last exception that was hit
@@ -388,15 +388,15 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param program The path to the program to execute
 	 * @param language The language of the program to execute
 	 */
-	public configure(program: string, language: "hb" | "hmmm"): boolean {
+	public configure(program: string, language: 'hb' | 'hmmm'): boolean {
 		this._language = language;
 
 		// Load the settings set by the user
-		const debuggingSettings = workspace.getConfiguration("hmmm.debugging");
-		this._stackEnabled = debuggingSettings.get<boolean>("enableReverseExecution", false);
-		this._maxStackDepth = debuggingSettings.get<number>("reverseExecutionDepth", 0);
-		this._instructionLogEnabled = debuggingSettings.get<boolean>("enableStackFrames", false);
-		this._maxInstructionLogLength = debuggingSettings.get<number>("stackFrameDepth", 0);
+		const debuggingSettings = workspace.getConfiguration('hmmm.debugging');
+		this._stackEnabled = debuggingSettings.get<boolean>('enableReverseExecution', false);
+		this._maxStackDepth = debuggingSettings.get<number>('reverseExecutionDepth', 0);
+		this._instructionLogEnabled = debuggingSettings.get<boolean>('enableStackFrames', false);
+		this._maxInstructionLogLength = debuggingSettings.get<number>('stackFrameDepth', 0);
 
 		// Load the program from the given file and return whether or not it was loaded successfully
 		return this.loadSource(program);
@@ -415,7 +415,7 @@ export class HMMMRuntime extends EventEmitter {
 		let code = this._sourceLines;
 
 		// If the code is assembly, attempt to compile it
-		if (this._language === "hmmm") {
+		if (this._language === 'hmmm') {
 			const compiledCode = compile(code);
 
 			// If compilation failed, return false (compilation failed)
@@ -441,7 +441,7 @@ export class HMMMRuntime extends EventEmitter {
 			// it's current value can be used as the address of this instruction
 
 			// If the language is assembly, we already populated the instruction to/from source maps
-			if (this._language === "hb") {
+			if (this._language === 'hb') {
 				this._instructionToSourceMap.set(this._numInstructions, i);
 				this._sourceToInstructionMap.set(i, this._numInstructions);
 			}
@@ -573,10 +573,10 @@ export class HMMMRuntime extends EventEmitter {
 
 		// Execute the instruction
 		switch (instruction.instruction.name) {
-			case "halt":
+			case 'halt':
 				this.sendEvent('end');
 				return;
-			case "read":
+			case 'read':
 				oldData = this._registers[rX!];
 				const input = strictParseInt(await window.showInputBox(<InputBoxOptions>{
 					placeHolder: `Enter a number to store into r${rX}`,
@@ -589,102 +589,102 @@ export class HMMMRuntime extends EventEmitter {
 				}
 				this.setRegister(rX!, input);
 				break;
-			case "write":
+			case 'write':
 				this.instructionOutput('stdout', s16IntToNumber(this._registers[rX!]).toString());
 				break;
-			case "jumpr":
+			case 'jumpr':
 				nextInstructionPointer = this._registers[rX!];
 				break;
-			case "setn":
+			case 'setn':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, N!);
 				break;
-			case "loadn":
+			case 'loadn':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._memory[N!]);
 				break;
-			case "storen":
+			case 'storen':
 				oldData = this._memory[N!];
 				this.setMemory(N!, this._registers[rX!]);
 				break;
-			case "loadr":
+			case 'loadr':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._memory[this._registers[rY!]]);
 				break;
-			case "storer":
+			case 'storer':
 				oldData = this._memory[this._registers[rY!]];
 				this.setMemory(this._registers[rY!], this._registers[rX!]);
 				break;
 			// pushr and popr actually modify two values, however, because the effect on rY is ALWAYS the same (and easily reversible),
 			// we only need to store the old value of rX or memory[rY]
-			case "popr":
+			case 'popr':
 				oldData = this._registers[rX!];
 				this.setRegister(rY!, this._registers[rY!] - 1);
 				this.setRegister(rX!, this._memory[this._registers[rY!]]);
 				break;
-			case "pushr":
+			case 'pushr':
 				oldData = this._memory[this._registers[rY!]];
 				this.setMemory(this._registers[rY!], this._registers[rX!]);
 				this.setRegister(rY!, this._registers[rY!] + 1);
 				break;
-			case "addn":
+			case 'addn':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rX!] + N!);
 				break;
-			case "nop":
+			case 'nop':
 				break;
-			case "copy":
+			case 'copy':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rY!]);
 				break;
-			case "add":
+			case 'add':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rY!] + this._registers[rZ!]);
 				break;
-			case "neg":
+			case 'neg':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, -this._registers[rY!]);
 				break;
-			case "sub":
+			case 'sub':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rY!] - this._registers[rZ!]);
 				break;
-			case "mul":
+			case 'mul':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rY!] * this._registers[rZ!]);
 				break;
-			case "div":
+			case 'div':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, Math.floor(this._registers[rY!] / this._registers[rZ!]));
 				break;
-			case "mod":
+			case 'mod':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this._registers[rY!] % this._registers[rZ!]);
 				break;
-			case "jumpn":
+			case 'jumpn':
 				nextInstructionPointer = N!;
 				break;
-			case "calln":
+			case 'calln':
 				oldData = this._registers[rX!];
 				this.setRegister(rX!, this.instructionPointer + 1);
 				nextInstructionPointer = N!;
 				break;
-			case "jeqzn":
+			case 'jeqzn':
 				if (this._registers[rX!] === 0) {
 					nextInstructionPointer = N!;
 				}
 				break;
-			case "jnezn":
+			case 'jnezn':
 				if (this._registers[rX!] !== 0) {
 					nextInstructionPointer = N!;
 				}
 				break;
-			case "jgtzn":
+			case 'jgtzn':
 				if (this._registers[rX!] > 0) {
 					nextInstructionPointer = N!;
 				}
 				break;
-			case "jltzn":
+			case 'jltzn':
 				if (this._registers[rX!] < 0) {
 					nextInstructionPointer = N!;
 				}
@@ -766,49 +766,49 @@ export class HMMMRuntime extends EventEmitter {
 		const oldData = instructionInfo.oldData;
 		if (oldData !== undefined) {
 			switch (instruction.instruction.name) {
-				case "halt":
+				case 'halt':
 					this.sendEvent('end');
 					return;
-				case "write":
-				case "jumpr":
-				case "nop":
-				case "jumpn":
-				case "jeqzn":
-				case "jnezn":
-				case "jgtzn":
-				case "jltzn":
+				case 'write':
+				case 'jumpr':
+				case 'nop':
+				case 'jumpn':
+				case 'jeqzn':
+				case 'jnezn':
+				case 'jgtzn':
+				case 'jltzn':
 					// These instructions don't change registers or memory, so we don't need to restore anything
 					break;
-				case "read":
-				case "setn":
-				case "loadn":
-				case "loadr":
-				case "copy":
-				case "addn":
-				case "add":
-				case "neg":
-				case "sub":
-				case "mul":
-				case "div":
-				case "mod":
-				case "calln":
+				case 'read':
+				case 'setn':
+				case 'loadn':
+				case 'loadr':
+				case 'copy':
+				case 'addn':
+				case 'add':
+				case 'neg':
+				case 'sub':
+				case 'mul':
+				case 'div':
+				case 'mod':
+				case 'calln':
 					// Restore rX
 					this.setRegister(rX!, oldData!);
 					break;
-				case "storen":
+				case 'storen':
 					// Restore memory[N]
 					this.setMemory(N!, oldData!);
 					break;
-				case "storer":
+				case 'storer':
 					// Restore memory[rY]
 					this.setMemory(this._registers[rY!], oldData!);
 					break;
-				case "popr":
+				case 'popr':
 					// Restore rX and increment rY
 					this.setRegister(rX!, oldData!);
 					this.setRegister(rY!, this._registers[rY!] + 1);
 					break;
-				case "pushr":
+				case 'pushr':
 					// Decrement rY and restore memory[rY]
 					this.setRegister(rY!, this._registers[rY!] - 1);
 					this.setMemory(this._registers[rY!], oldData!);
@@ -851,7 +851,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param startFrame The index of the first frame to return. If not specified, 0 is used
 	 * @param levels The maximum number of frames to return. If not specified, all frames are returned
 	 */
-	public getStack(startFrame: number = 0, levels: number = this._stack.length + 1): DebugProtocol.StackTraceResponse["body"] {
+	public getStack(startFrame: number = 0, levels: number = this._stack.length + 1): DebugProtocol.StackTraceResponse['body'] {
 		// Because the 0th frame is the top of the stack (the current instruction), it is not part of this._stack, so
 		// when we slice this._stack, we need to start at startFrame - 1
 		const sliceStart = Math.max(startFrame - 1, 0);
@@ -867,12 +867,12 @@ export class HMMMRuntime extends EventEmitter {
 				// The id of the frame is the index of the frame in the stack. This makes it easy to lookup the frame later
 				// This only has to be valid while execution is paused, so it's fine if the stack changes later
 				id: sliceStart + idx,
-				name: decompiledInstruction ? `${frame.instructionPointer} ${decompiledInstruction}` : "Invalid Instruction",
+				name: decompiledInstruction ? `${frame.instructionPointer} ${decompiledInstruction}` : 'Invalid Instruction',
 				// Try to get the source line number of the instruction
 				// If the instruction does not correspond to a source line, set the line number to -1
 				line: this._instructionToSourceMap.get(frame.instructionPointer) ?? -1,
 				column: 0,
-				presentationHint: decompiledInstruction ? "normal" : "label",
+				presentationHint: decompiledInstruction ? 'normal' : 'label',
 				// We can restart execution at any frame in the stack
 				canRestart: true
 			};
@@ -886,7 +886,7 @@ export class HMMMRuntime extends EventEmitter {
 				name: this.getInstructionAt(this.instructionPointer),
 				line: this._instructionToSourceMap.get(this.instructionPointer) ?? -1,
 				column: 0,
-				presentationHint: "subtle",
+				presentationHint: 'subtle',
 				// It doesn't make sense to restart execution at the current frame because that would be a no-op
 				canRestart: false
 			};
@@ -1054,12 +1054,12 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param onWrite Whether the breakpoint should be triggered when data is written to the specified location
 	 * @returns The id of the new breakpoint
 	 */
-	public setDataBreakpoint(address: number, type: "register" | "memory", onRead: boolean, onWrite: boolean): number {
+	public setDataBreakpoint(address: number, type: 'register' | 'memory', onRead: boolean, onWrite: boolean): number {
 		// Create a unique id for the breakpoint
 		const id = this._breakpointId++;
 
 		// Add the breakpoint to the appropriate map(s)
-		if (type === "register") {
+		if (type === 'register') {
 			if (onRead) {
 				this._registerReadBreakpoints.set(address, id);
 			}
@@ -1143,7 +1143,7 @@ export class HMMMRuntime extends EventEmitter {
 			// something resembling a valid instruction
 
 			// Consider the line to map to a valid instruction if and only if
-			if (this._language === "hb") {
+			if (this._language === 'hb') {
 				// The file contains binary instructions and the line is a valid binary instruction
 				if (binaryRegex.test(lineText)) validLines.push(line);
 			} else {
@@ -1162,9 +1162,9 @@ export class HMMMRuntime extends EventEmitter {
 	 * @returns The decompiled instruction, or "Invalid Instruction" if the instruction is invalid
 	 */
 	public getInstructionAt(address: number): string {
-		if (address < 0 || address > 255) return "Invalid Instruction Pointer";
+		if (address < 0 || address > 255) return 'Invalid Instruction Pointer';
 		const instruction = decompileInstruction(this._memory[address]);
-		return instruction ? `${address} ${instruction}` : "Invalid Instruction";
+		return instruction ? `${address} ${instruction}` : 'Invalid Instruction';
 	}
 
 	/**
@@ -1206,82 +1206,82 @@ export class HMMMRuntime extends EventEmitter {
 		// Although due to the way I've implemented breakpoints, it doesn't matter, we'll push the accesses in
 		// the order that they would occur in the instruction execution so that exceptions/breakpoints are triggered in a consistent order
 		switch (instruction.instruction.name) {
-			case "halt":
-			case "nop":
-			case "jumpn":
+			case 'halt':
+			case 'nop':
+			case 'jumpn':
 				// These instructions don't read or write anything
 				break;
-			case "write":
-			case "jumpr":
-			case "jeqzn":
-			case "jnezn":
-			case "jgtzn":
-			case "jltzn":
+			case 'write':
+			case 'jumpr':
+			case 'jeqzn':
+			case 'jnezn':
+			case 'jgtzn':
+			case 'jltzn':
 				// These instructions read from rX
-				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'read' });
 				break;
-			case "read":
-			case "setn":
-			case "calln":
+			case 'read':
+			case 'setn':
+			case 'calln':
 				// These instructions write to rX
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "loadn":
+			case 'loadn':
 				// loadn reads from memory[N] and then writes to rX
-				accesses.push({ address: N!, dataType: "memory", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: N!, dataType: 'memory', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "loadr":
+			case 'loadr':
 				// loadr reads from memory[rY] (and thus must read from rY) and then writes to rX
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: this._registers[rY!], dataType: 'memory', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "addn":
+			case 'addn':
 				// addn reads from rX and then writes to rX
-				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "add":
-			case "sub":
-			case "mul":
-			case "div":
-			case "mod":
+			case 'add':
+			case 'sub':
+			case 'mul':
+			case 'div':
+			case 'mod':
 				// These instructions read from rY and rZ and then write to rX
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rZ!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rZ!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "copy":
-			case "neg":
+			case 'copy':
+			case 'neg':
 				// These instructions read from rY and then write to rX
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
 				break;
-			case "storen":
+			case 'storen':
 				// storen reads from rX and then writes to memory[N]
-				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
-				accesses.push({ address: N!, dataType: "memory", accessType: "write" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: N!, dataType: 'memory', accessType: 'write' });
 				break;
-			case "storer":
+			case 'storer':
 				// storer reads from rX and then writes to memory[rY] (and thus must read from rY)
-				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "write" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: this._registers[rY!], dataType: 'memory', accessType: 'write' });
 				break;
-			case "popr":
+			case 'popr':
 				// popr reads from memory[rY] (and thus must read from rY) and then writes to rX and updates rY
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: this._registers[rY!] - 1, dataType: "memory", accessType: "read" });
-				accesses.push({ address: rX!, dataType: "register", accessType: "write" });
-				accesses.push({ address: rY!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: this._registers[rY!] - 1, dataType: 'memory', accessType: 'read' });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'write' });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'write' });
 				break;
-			case "pushr":
+			case 'pushr':
 				// pushr reads from rX and then writes to memory[rY] (and thus must read from rY) and updates rY
-				accesses.push({ address: rX!, dataType: "register", accessType: "read" });
-				accesses.push({ address: rY!, dataType: "register", accessType: "read" });
-				accesses.push({ address: this._registers[rY!], dataType: "memory", accessType: "write" });
-				accesses.push({ address: rY!, dataType: "register", accessType: "write" });
+				accesses.push({ address: rX!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'read' });
+				accesses.push({ address: this._registers[rY!], dataType: 'memory', accessType: 'write' });
+				accesses.push({ address: rY!, dataType: 'register', accessType: 'write' });
 				break;
 		}
 
@@ -1303,14 +1303,14 @@ export class HMMMRuntime extends EventEmitter {
 		// For each access,
 		for (const access of accesses) {
 			// Determine if the access hits a breakpoint/exception
-			if (access.dataType === "register") {
+			if (access.dataType === 'register') {
 				// All breakpoints which can occur on registers can be masked by _ignoreBreakpoints
 				if (this._ignoreBreakpoints) continue;
 
-				if (access.accessType === "read" && this._registerReadBreakpoints.has(access.address)) {
+				if (access.accessType === 'read' && this._registerReadBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._registerReadBreakpoints.get(access.address)!);
 				}
-				if (access.accessType === "write" && this._registerWriteBreakpoints.has(access.address)) {
+				if (access.accessType === 'write' && this._registerWriteBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._registerWriteBreakpoints.get(access.address)!);
 				}
 			} else {
@@ -1319,33 +1319,33 @@ export class HMMMRuntime extends EventEmitter {
 				// Throw an exception if the instruction attempts to access an invalid memory address
 				if (access.address < 0 || access.address > 255) {
 					const message = `Instruction at ${this.instructionPointer} attempted to access invalid memory address ${access.address}`;
-					this.onException("invalid-memory-access", message, true);
+					this.onException('invalid-memory-access', message, true);
 					// This is a critical exception, so if it occurs, we always need to stop execution
 					return true;
 				}
 
 				// Throw an exception if the instruction attempts to access the code segment
 				if (access.address < this._numInstructions) {
-					if (access.accessType === "read") {
+					if (access.accessType === 'read') {
 						const message = `Instruction at ${this.instructionPointer} attempted to read from the code segment at address ${access.address}`;
 						// Because this exception is non-critical, the exception handler may choose to ignore it
 						// Only stop execution if the it does not
-						if (this.onException("cs-read", message, false)) return true;
-					} else if (access.accessType === "write") {
+						if (this.onException('cs-read', message, false)) return true;
+					} else if (access.accessType === 'write') {
 						const message = `Instruction at ${this.instructionPointer} attempted to write to the code segment at address ${access.address}`;
 						// Because this exception is non-critical, the exception handler may choose to ignore it
 						// Only stop execution if the it does not
-						if (this.onException("cs-write", message, false)) return true;
+						if (this.onException('cs-write', message, false)) return true;
 					}
 				}
 
 				// The remaining breakpoints can be masked by _ignoreBreakpoints
 				if (this._ignoreBreakpoints) continue;
 
-				if (access.accessType === "read" && this._memoryReadBreakpoints.has(access.address)) {
+				if (access.accessType === 'read' && this._memoryReadBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._memoryReadBreakpoints.get(access.address)!);
 				}
-				if (access.accessType === "write" && this._memoryWriteBreakpoints.has(access.address)) {
+				if (access.accessType === 'write' && this._memoryWriteBreakpoints.has(access.address)) {
 					hitBreakpoints.push(this._memoryWriteBreakpoints.get(access.address)!);
 				}
 			}
@@ -1371,7 +1371,7 @@ export class HMMMRuntime extends EventEmitter {
 			const message = `Attempted to execute an instruction outside of the code segment at address ${this.instructionPointer}`;
 			// Because this exception is non-critical, the exception handler may choose to ignore it
 			// Only stop execution if the it does not
-			if (this.onException("execute-outside-cs", message, false)) {
+			if (this.onException('execute-outside-cs', message, false)) {
 				return true;
 			}
 		}
@@ -1379,7 +1379,7 @@ export class HMMMRuntime extends EventEmitter {
 		// Throw an exception if the instruction pointer is out of range
 		if (this.instructionPointer < 0 || this.instructionPointer > 255) {
 			const message = `Instruction at ${this.instructionPointer} attempted to access invalid memory address ${this.instructionPointer}`;
-			this.onException("invalid-memory-access", message, true);
+			this.onException('invalid-memory-access', message, true);
 			// This is a critical exception, so if it occurs, we always need to stop execution
 			return true;
 		}
@@ -1397,7 +1397,7 @@ export class HMMMRuntime extends EventEmitter {
 	 */
 	private onInvalidInstruction() {
 		const message = `Invalid Instruction at Address ${this.instructionPointer}: 0x${this._memory[this.instructionPointer].toString(16).padStart(4, '0')}`;
-		this.onException("invalid-instruction", message, true);
+		this.onException('invalid-instruction', message, true);
 	}
 
 	/**
@@ -1442,7 +1442,7 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param category The category of the output (stdout or stderr)
 	 * @param message The message to print
 	 */
-	private instructionOutput(category: "stdout" | "stderr", message: string) {
+	private instructionOutput(category: 'stdout' | 'stderr', message: string) {
 		const line = this._instructionToSourceMap.get(this.instructionPointer);
 		this.sendEvent('output', message, category, line);
 	}

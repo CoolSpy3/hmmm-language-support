@@ -1,26 +1,26 @@
 //#region Language Server Setup
 
-import { TextDocument } from "vscode-languageserver-textdocument";
+import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-	Diagnostic,
-	DiagnosticSeverity,
-	DocumentFormattingParams,
-	InitializeParams,
-	InlayHint,
-	InlayHintParams,
-	ProposedFeatures,
-	SemanticTokens,
-	SemanticTokensBuilder,
-	SemanticTokensParams,
-	TextDocumentSyncKind,
-	TextDocuments,
-	TextEdit,
-	createConnection,
-	uinteger
-} from "vscode-languageserver/node";
-import { binaryRegex, decompileInstruction, formatBinaryNumber, parseBinaryInstruction } from "../../hmmm-spec/out/hmmm";
-import { applyTrailingNewlineEdits, getRangeForLine } from "./helperfunctions";
-import { TokenModifiers, TokenTypes, computeLegend } from "./semantictokens";
+    Diagnostic,
+    DiagnosticSeverity,
+    DocumentFormattingParams,
+    InitializeParams,
+    InlayHint,
+    InlayHintParams,
+    ProposedFeatures,
+    SemanticTokens,
+    SemanticTokensBuilder,
+    SemanticTokensParams,
+    TextDocumentSyncKind,
+    TextDocuments,
+    TextEdit,
+    createConnection,
+    uinteger
+} from 'vscode-languageserver/node';
+import { binaryRegex, decompileInstruction, formatBinaryNumber, parseBinaryInstruction } from '../../hmmm-spec/out/hmmm';
+import { applyTrailingNewlineEdits, getRangeForLine } from './helperfunctions';
+import { TokenModifiers, TokenTypes, computeLegend } from './semantictokens';
 
 // Create a connection for the server
 const connection = createConnection(ProposedFeatures.all);

@@ -1,13 +1,13 @@
 import {
-	DebugAdapterDescriptor,
-	DebugAdapterDescriptorFactory,
-	DebugAdapterInlineImplementation,
-	DebugConfiguration,
-	DebugConfigurationProvider,
-	DebugSession,
-	ProviderResult
-} from "vscode";
-import { HMMMDebugSession } from "./debugadapter";
+    DebugAdapterDescriptor,
+    DebugAdapterDescriptorFactory,
+    DebugAdapterInlineImplementation,
+    DebugConfiguration,
+    DebugConfigurationProvider,
+    DebugSession,
+    ProviderResult
+} from 'vscode';
+import { HMMMDebugSession } from './debugadapter';
 
 /**
  * Tells VSCode how to create a debug adapter for the HMMM debugger.

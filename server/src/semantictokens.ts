@@ -1,6 +1,6 @@
 // Copied from: https://github.com/microsoft/vscode-languageserver-node/blob/main/testbed/server/src/server.ts
 
-import { SemanticTokensClientCapabilities, SemanticTokensLegend } from "vscode-languageserver/node";
+import { SemanticTokensClientCapabilities, SemanticTokensLegend } from 'vscode-languageserver/node';
 
 export enum TokenTypes {
 	comment = 0,
