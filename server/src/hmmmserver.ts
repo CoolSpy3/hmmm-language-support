@@ -466,6 +466,8 @@ connection.onCompletion(
 
 		if (isInIndexRange(position, InstructionPart.OTHER, indices)) return completionList; // The cursor is at the end of the line, so don't suggest anything
 
+		indices[InstructionPart.LINE_NUM][0] = 0; // Anything to the left of the first element in the line is part of the line number
+
 		if (isInIndexRange(position, InstructionPart.LINE_NUM, indices)) {
 			// The cursor is in the line number, so suggest the next line number
 			populateLineNumber(completionList, params.position.line, document);
