@@ -1,170 +1,170 @@
 {
-  "name": "hmmm-language-support",
-  "displayName": "HMMM Language Support",
-  "description": "A HMMM Syntax Highlighter, Debugger, Linter, and Formatter",
-  "version": "2.0.0",
-  "publisher": "CoolSpy3",
-  "main": "./client/out/extension.js",
-  "categories": [
-    "Programming Languages",
-    "Debuggers",
-    "Formatters",
-    "Linters"
-  ],
-  "keywords": [
-    "HMMM",
-    "Harvey Mudd",
-    "Harvey Mudd Miniature Machine"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/CoolSpy3/hmmm-language-support"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -b",
-    "watch": "tsc -b -w",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
-    "postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
-    "test": "vscode-test"
-  },
-  "activationEvents": [
-    "onDebugResolve:hb",
-    "onDebugDynamicConfigurations:hb",
-    "onDebugResolve:hmmm",
-    "onDebugDynamicConfigurations:hmmm"
-  ],
-  "contributes": {
-    "breakpoints": [
-      {
-        "language": "hb"
-      },
-      {
-        "language": "hmmm"
-      }
-    ],
-    "commands": [
-      {
-        "command": "hmmm.build",
-        "title": "HMMM: Build Program",
-        "enablement": "editorLangId == 'hmmm'"
-      }
-    ],
-    "configuration": {
-      "title": "HMMM Language Support",
-      "properties": {
-        "hmmm.debugging.enableReverseExecution": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable reverse execution for HMMM programs"
-        },
-        "hmmm.debugging.reverseExecutionDepth": {
-          "type": "number",
-          "default": 2000000,
-          "description": "The maximum number of instructions that can be executed when reverse stepping"
-        },
-        "hmmm.debugging.enableStackFrames": {
-          "type": "boolean",
-          "default": true,
-          "description": "Keep track of jumps and calls when debugging HMMM programs"
-        },
-        "hmmm.debugging.stackFrameDepth": {
-          "type": "number",
-          "default": 500000,
-          "description": "The maximum number of instructions that can be executed when stepping through a stack frame"
-        }
-      }
-    },
-    "debuggers": [
-      {
-        "type": "hmmm",
-        "label": "HMMM Debug",
-        "languages": [ "hb", "hmmm" ],
-        "configurationAttributes": {
-          "launch": {
-            "required": [ "program" ],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "The program to debug"
-              },
-              "isBinary": {
-                "type": "boolean",
-                "description": "Whether the program is a compiled (HMMM Binary) file"
-              }
-            }
-          }
-        },
-        "initialConfigurations": [
-          {
-            "type": "hmmm",
-            "request": "launch",
-            "name": "Debug HMMM",
-            "program": "${file}",
-            "isBinary": false
-          },
-          {
-            "type": "hmmm",
-            "request": "launch",
-            "name": "Debug HMMM (Binary)",
-            "program": "${file}",
-            "isBinary": true
-          }
-        ],
-        "configurationSnippets": [
-          {
-            "type": "hmmm",
-            "request": "launch",
-            "name": "Debug HMMM",
-            "program": "",
-            "isBinary": false
-          }
-        ]
-      }
-    ],
-    "grammars": [
-      {
-        "language": "hmmm",
-        "scopeName": "source.hmmm",
-        "path": "./syntaxes/hmmm.tmLanguage.json"
-      },
-      {
-        "language": "hb",
-        "scopeName": "source.hb",
-        "path": "./syntaxes/hb.tmLanguage.json"
-      }
-    ],
-    "languages": [
-      {
-        "id": "hmmm",
-        "aliases": ["HMMM", "hmmm"],
-        "extensions": [".hmmm"],
-        "configuration": "./syntaxes/hmmm-language-configuration.json"
-      },
-      {
-        "id": "hb",
-        "aliases": ["HB", "hb", "HMMM Binary"],
-        "extensions": [".hb"],
-        "configuration": "./syntaxes/hb-language-configuration.json"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "hmmm.build",
-          "when": "editorLangId == 'hmmm'"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "hmmm.build",
-          "when": "editorLangId == 'hmmm'"
-        }
-      ]
-    }
-  }
+	"name": "hmmm-language-support",
+	"displayName": "HMMM Language Support",
+	"description": "A HMMM Syntax Highlighter, Debugger, Linter, and Formatter",
+	"version": "2.0.0",
+	"publisher": "CoolSpy3",
+	"main": "./client/out/extension.js",
+	"categories": [
+		"Programming Languages",
+		"Debuggers",
+		"Formatters",
+		"Linters"
+	],
+	"keywords": [
+		"HMMM",
+		"Harvey Mudd",
+		"Harvey Mudd Miniature Machine"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/CoolSpy3/hmmm-language-support"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run compile",
+		"compile": "tsc -b",
+		"watch": "tsc -b -w",
+		"pretest": "npm run compile && npm run lint",
+		"lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
+		"postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
+		"test": "vscode-test"
+	},
+	"activationEvents": [
+		"onDebugResolve:hb",
+		"onDebugDynamicConfigurations:hb",
+		"onDebugResolve:hmmm",
+		"onDebugDynamicConfigurations:hmmm"
+	],
+	"contributes": {
+		"breakpoints": [
+			{
+				"language": "hb"
+			},
+			{
+				"language": "hmmm"
+			}
+		],
+		"commands": [
+			{
+				"command": "hmmm.build",
+				"title": "HMMM: Build Program",
+				"enablement": "editorLangId == 'hmmm'"
+			}
+		],
+		"configuration": {
+			"title": "HMMM Language Support",
+			"properties": {
+				"hmmm.debugging.enableReverseExecution": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable reverse execution for HMMM programs"
+				},
+				"hmmm.debugging.reverseExecutionDepth": {
+					"type": "number",
+					"default": 2000000,
+					"description": "The maximum number of instructions that can be executed when reverse stepping"
+				},
+				"hmmm.debugging.enableStackFrames": {
+					"type": "boolean",
+					"default": true,
+					"description": "Keep track of jumps and calls when debugging HMMM programs"
+				},
+				"hmmm.debugging.stackFrameDepth": {
+					"type": "number",
+					"default": 500000,
+					"description": "The maximum number of instructions that can be executed when stepping through a stack frame"
+				}
+			}
+		},
+		"debuggers": [
+			{
+				"type": "hmmm",
+				"label": "HMMM Debug",
+				"languages": [ "hb", "hmmm" ],
+				"configurationAttributes": {
+					"launch": {
+						"required": [ "program" ],
+						"properties": {
+							"program": {
+								"type": "string",
+								"description": "The program to debug"
+							},
+							"isBinary": {
+								"type": "boolean",
+								"description": "Whether the program is a compiled (HMMM Binary) file"
+							}
+						}
+					}
+				},
+				"initialConfigurations": [
+					{
+						"type": "hmmm",
+						"request": "launch",
+						"name": "Debug HMMM",
+						"program": "${file}",
+						"isBinary": false
+					},
+					{
+						"type": "hmmm",
+						"request": "launch",
+						"name": "Debug HMMM (Binary)",
+						"program": "${file}",
+						"isBinary": true
+					}
+				],
+				"configurationSnippets": [
+					{
+						"type": "hmmm",
+						"request": "launch",
+						"name": "Debug HMMM",
+						"program": "",
+						"isBinary": false
+					}
+				]
+			}
+		],
+		"grammars": [
+			{
+				"language": "hmmm",
+				"scopeName": "source.hmmm",
+				"path": "./syntaxes/hmmm.tmLanguage.json"
+			},
+			{
+				"language": "hb",
+				"scopeName": "source.hb",
+				"path": "./syntaxes/hb.tmLanguage.json"
+			}
+		],
+		"languages": [
+			{
+				"id": "hmmm",
+				"aliases": ["HMMM", "hmmm"],
+				"extensions": [".hmmm"],
+				"configuration": "./syntaxes/hmmm-language-configuration.json"
+			},
+			{
+				"id": "hb",
+				"aliases": ["HB", "hb", "HMMM Binary"],
+				"extensions": [".hb"],
+				"configuration": "./syntaxes/hb-language-configuration.json"
+			}
+		],
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "hmmm.build",
+					"when": "editorLangId == 'hmmm'"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "hmmm.build",
+					"when": "editorLangId == 'hmmm'"
+				}
+			]
+		}
+	}
 }

@@ -1,15 +1,15 @@
 {
-  "name": "hmmm-specification",
-  "description": "Code for reading HMMM instructions",
-  "publisher": "CoolSpy3",
-  "version": "1.0.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/CoolSpy3/hmmm-language-support"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@types/node": "^20.10.4"
-  },
-  "references": []
+	"name": "hmmm-specification",
+	"description": "Code for reading HMMM instructions",
+	"publisher": "CoolSpy3",
+	"version": "1.0.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/CoolSpy3/hmmm-language-support"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@types/node": "^20.10.4"
+	},
+	"references": []
 }

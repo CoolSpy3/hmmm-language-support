@@ -1,28 +1,28 @@
 {
-  "name": "hmmm-language-client",
-  "description": "Language client for HMMM",
-  "publisher": "CoolSpy3",
-  "version": "1.0.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/CoolSpy3/hmmm-language-support"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "dependencies": {
-    "@vscode/debugadapter": "^1.64.0",
-    "vscode-languageclient": "^9.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.4",
-    "@types/vscode": "^1.85.0",
-    "@vscode/test-electron": "^2.3.8"
-  },
-  "references": [
-    {
-      "path": "../hmmm-spec",
-      "prepend": true
-    }
-  ]
+	"name": "hmmm-language-client",
+	"description": "Language client for HMMM",
+	"publisher": "CoolSpy3",
+	"version": "1.0.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/CoolSpy3/hmmm-language-support"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"dependencies": {
+		"@vscode/debugadapter": "^1.64.0",
+		"vscode-languageclient": "^9.0.1"
+	},
+	"devDependencies": {
+		"@types/node": "^20.10.4",
+		"@types/vscode": "^1.85.0",
+		"@vscode/test-electron": "^2.3.8"
+	},
+	"references": [
+		{
+			"path": "../hmmm-spec",
+			"prepend": true
+		}
+	]
 }

@@ -1,11 +1,11 @@
 {
-    "comments": {
-        "lineComment": "#",
-    },
-    "colorizedBracketPairs": [
-        [
-            "pushr",
-            "popr"
-        ]
-    ]
+	"comments": {
+		"lineComment": "#",
+	},
+	"colorizedBracketPairs": [
+		[
+			"pushr",
+			"popr"
+		]
+	]
 }
