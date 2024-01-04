@@ -81,7 +81,7 @@ documents.onDidChangeContent(change => {
 });
 
 // Keep track of error causes, so we can suggest fixes
-type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'missing_operand' | 'too_many_operands';
+type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'invalid_operand_type' | 'missing_operand' | 'too_many_operands';
 
 /**
  * Validates a text document and sends diagnostics to the client
@@ -277,7 +277,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 									message: `${instruction.name} expects a register as operand 1`,
 									source: 'HMMM Language Server',
-									data: 'invalid_register'
+									data: 'invalid_operand_type'
 								});
 							}
 							break;
@@ -288,7 +288,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
 									source: 'HMMM Language Server',
-									data: 'invalid_number'
+									data: 'invalid_operand_type'
 								});
 							}
 							break;
@@ -299,7 +299,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
 									source: 'HMMM Language Server',
-									data: 'invalid_number'
+									data: 'invalid_operand_type'
 								});
 							}
 							break;
