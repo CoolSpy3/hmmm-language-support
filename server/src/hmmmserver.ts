@@ -146,8 +146,8 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			m = instructionRegex.exec(`0 ${line}`) ?? m;
 			indices = m.indices ?? defaultIndices;
 		} else if (lineNum !== numCodeLines) { // The line number is not correct
-			diagnostics.push({ // Add a warning diagnostic
-				severity: DiagnosticSeverity.Warning,
+			diagnostics.push({ // Add an error diagnostic
+				severity: DiagnosticSeverity.Error,
 				range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
 				message: `Incorrect line number! Should be ${numCodeLines}`,
 				source: 'HMMM Language Server',
@@ -186,7 +186,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				});
 			} else if (operandType === 'invalid_number') { // The operand is a number that is out of range
 				diagnostics.push({
-					severity: DiagnosticSeverity.Warning,
+					severity: DiagnosticSeverity.Error,
 					range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 					message: `Invalid number! HMMM only supports numerical arguments from -128 to 127 (signed) or 0 to 255 (unsigned)`,
 					source: 'HMMM Language Server',
@@ -284,7 +284,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 						case 'signed_number':
 							if (operandType !== 'signed_number' && operandType !== 'number') {
 								diagnostics.push({ // The instruction expects a signed number, but the operand is not a signed number
-									severity: operandType === 'unsigned_number' || operandType === 'invalid_number' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
+									severity: DiagnosticSeverity.Error,
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
 									source: 'HMMM Language Server',
@@ -295,7 +295,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 						case 'unsigned_number':
 							if (operandType !== 'unsigned_number' && operandType !== 'number') {
 								diagnostics.push({ // The instruction expects an unsigned number, but the operand is not an unsigned number
-									severity: operandType === 'signed_number' || operandType === 'invalid_number' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error, // Warning if the number is out of range, error otherwise
+									severity: DiagnosticSeverity.Error,
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
 									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
 									source: 'HMMM Language Server',
