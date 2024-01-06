@@ -116,12 +116,14 @@ If you are not familiar with debugging code in VSCode, it is recommended that yo
 This means that you can use most of the same keybindings and commands that you would use when debugging any other language in VSCode. A more detailed description of the features provided by this extension is below.
 
 ### Starting the Debugger
-The extension also provides debugging support for HMMM assembly and binary files. To launch the debugger, open a HMMM assembly or binary file and press `F5`. This will open the debug view and start the debugger. (Alternatively, you may also goto `Run > Start Debugging`.)
+The extension also provides debugging support for HMMM assembly and binary files. To launch the debugger, create a launch configuration (see below), open a HMMM assembly or binary file, and press `F5`. This will open the debug view and start the debugger. (Alternatively, you may also goto `Run > Start Debugging`.)
 
-#### With an automatic launch configuration
+#### Creating an automatic launch configuration
+To create an automatic launch configuration (which should be suitable for most projects), go to the `Run and Debug` view and click on `create a launch.json file`. Then select `HMMM Debug`.
+
 By default, the debugger will attempt to run the currently open file as a HMMM assembly file. This should be the most common use case. If you wish to debug a HMMM binary file, you must go to the `Run and Debug` view and change the configuration to `Debug HMMM (Binary)` (You may have to attempt to run the file once to get the menu to show up.)
 
-#### With a manual launch configuration
+#### Creating a manual launch configuration
 Alternatively, you can also create a VSCode launch configuration to debug HMMM files. The basic syntax for a launch configuration is:
 ``` json
 {
