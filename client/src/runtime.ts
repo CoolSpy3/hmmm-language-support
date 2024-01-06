@@ -959,7 +959,7 @@ export class HMMMRuntime extends EventEmitter {
 		if (!this._stackEnabled) return;
 
 		// If the stack is already at the maximum depth, pop the bottom frame off the stack
-		if (this._stack.length >= this._maxStackDepth) {
+		if (this._maxStackDepth > 0 && this._stack.length >= this._maxStackDepth) {
 			this._stack.pop();
 			// If we haven't already warned the user about the stack depth being exceeded, do so now
 			if (!this._hasSentStackDepthWarning) {
@@ -984,7 +984,7 @@ export class HMMMRuntime extends EventEmitter {
 		if (!this._instructionLogEnabled) return;
 
 		// If the instruction log is at the maximum length, remove the oldest entry
-		if (this._instructionLog.length >= this._maxInstructionLogLength) {
+		if (this._maxInstructionLogLength > 0 && this._instructionLog.length >= this._maxInstructionLogLength) {
 			this._instructionLog.pop();
 
 			// If we haven't already warned the user about the instruction log length being exceeded, do so now
