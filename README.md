@@ -16,7 +16,13 @@ This is a quick bullet list of the features provided by this extension. For a de
 
 #### HMMM Assembly Files
 * Syntax Highlighting
-	* Instructions, Registers (& special registers), Numbers, Comments, Line Numbers, pushr/popr
+	* Instructions
+	* Registers
+		* `r0`, `r13`, `r14`, `r15` are highlighted separately
+	* Numbers
+	* Comments
+	* Line Numbers
+	* Matching `pushr` / `popr` pairs
 * Code Validation
 	* Missing/Incorrect Line Numbers
 	* Invalid Instruction

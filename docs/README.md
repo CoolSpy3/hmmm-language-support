@@ -9,7 +9,7 @@ By default, the extension associates the `.hmmm` and `.hb` file extensions with 
 ### HMMM Assembly
 
 #### Syntax Highlighting
-The HMMM Language Support extension provides syntax highlighting for HMMM assembly files. This includes highlighting for instructions, registers, numbers, comments, line numbers, and pushr/popr instructions. Additionally, the registers `r0`, `r13`, `r14`, and `r15` are highlighted differently to indicate that they have special uses in HMMM conventions (or in the case of `r0`, the HMMM language itself).
+The HMMM Language Support extension provides syntax highlighting for HMMM assembly files. This includes highlighting for instructions, registers, numbers, comments, line numbers, and pushr/popr instructions. Additionally, the registers `r0`, `r13`, `r14`, and `r15` are highlighted differently to indicate that they have special uses in HMMM conventions (or in the case of `r0`, the HMMM language itself). The extension also highlights corresponding pairs of `pushr` and `popr` instructions.
 
 #### Code Validation
 The extension will attempt to validate code in HMMM assembly files. This includes checking for missing or incorrect line numbers, invalid instructions, and invalid operands for each instruction. Additionally, the extension will attempt to suggest fixes for errors that it finds.
@@ -23,6 +23,8 @@ A full list of errors and fixes that the extension can provide is listed below:
 	* *Quick Fix*: Add a line number to the line. (The extension will suggest the line number which corresponds to the number of code lines above the line in the file.)
 * **Incorrect Line Number** - The line number does not match the expected number of the line.
 	* *Quick Fix*: Change the line number to the expected number.
+* **Line Number Out of Range** - The line number is outside of the range of line numbers which can be represented in HMMM binary (0-255). Programs with greater than 256 lines are not supported by the HMMM language.
+	* *No quick fixes provided*
 * **Missing Instruction** - The line is missing an instruction.
 	* *No quick fixes provided*
 * **Unknown Instruction** - The instruction is not a valid HMMM instruction.
