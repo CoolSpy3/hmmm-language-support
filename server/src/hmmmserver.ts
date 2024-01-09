@@ -82,7 +82,21 @@ documents.onDidChangeContent(change => {
 });
 
 // Keep track of error causes, so we can suggest fixes
-type HMMMErrorType = 'invalid_line' | 'missing_line_num' | 'incorrect_line_num' | 'invalid_operand' | 'invalid_register' | 'invalid_number' | 'unexpected_token' | 'missing_instruction' | 'invalid_instruction' | 'invalid_operand_type' | 'missing_operand' | 'too_many_operands' | 'jump_outside_cs';
+type HMMMErrorType =
+	'invalid_line' |
+	'missing_line_num' |
+	'incorrect_line_num' |
+	'line_num_out_of_range' |
+	'invalid_operand' |
+	'invalid_register' |
+	'invalid_number' |
+	'unexpected_token' |
+	'missing_instruction' |
+	'invalid_instruction' |
+	'invalid_operand_type' |
+	'missing_operand' |
+	'too_many_operands' |
+	'jump_outside_cs';
 
 /**
  * Validates a text document and sends diagnostics to the client
@@ -150,14 +164,25 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			// Assume the user just forgot a line number and the rest of the line is correct. Try to match the line with a line number of 0
 			m = instructionRegex.exec(`0 ${line}`) ?? m;
 			indices = m.indices ?? defaultIndices;
-		} else if (lineNum !== numCodeLines) { // The line number is not correct
-			diagnostics.push({ // Add an error diagnostic
-				severity: DiagnosticSeverity.Error,
-				range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
-				message: `Incorrect line number! Should be ${numCodeLines}`,
-				source: 'HMMM Language Server',
-				data: 'incorrect_line_num'
-			});
+		} else {
+			if (lineNum !== numCodeLines) { // The line number is not correct
+				diagnostics.push({ // Add an error diagnostic
+					severity: DiagnosticSeverity.Error,
+					range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
+					message: `Incorrect line number! Should be ${numCodeLines}`,
+					source: 'HMMM Language Server',
+					data: 'incorrect_line_num'
+				});
+			}
+			if(lineNum > 255) {
+				diagnostics.push({
+					severity: DiagnosticSeverity.Error,
+					range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
+					message: `Line number is out of range! HMMM programs can only have 256 lines of code`,
+					source: 'HMMM Language Server',
+					data: 'line_num_out_of_range'
+				});
+			}
 		}
 
 		numCodeLines++; // Increment the number of code lines
