@@ -72,7 +72,7 @@ export function computeLegend(capability: SemanticTokensClientCapabilities): Sem
 			tokenModifiers.push(str);
 		} else {
 			// If the client doesn't support the modifier, push something so that the indices don't get misaligned
-			tokenModifiers.push('')
+			tokenModifiers.push('');
 		}
 	}
 

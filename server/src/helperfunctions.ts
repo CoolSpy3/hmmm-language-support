@@ -1,11 +1,11 @@
 import { Position, TextDocument } from 'vscode-languageserver-textdocument';
 import {
-    CompletionItemKind,
-    CompletionList,
-    DocumentFormattingParams,
-    Range,
-    TextEdit,
-    uinteger
+	CompletionItemKind,
+	CompletionList,
+	DocumentFormattingParams,
+	Range,
+	TextEdit,
+	uinteger
 } from 'vscode-languageserver/node';
 import { getInstructionRepresentation, getInstructionSignature, hmmmInstructions, preprocessLine } from '../../hmmm-spec/out/hmmm';
 
@@ -33,7 +33,7 @@ export function isInIndexRange(value: number, index: number, indices: RegExpIndi
 export function getSelectedWord(document: TextDocument, position: Position): [string, Range] {
 	const line = document.getText(getRangeForLine(position.line)); // Get the whole line
 	// Set the range to the given position (0 width)
-	let wordRange = Range.create(position.line, position.character, position.line, position.character); // Copy position so start and end don't point to the same object
+	const wordRange = Range.create(position.line, position.character, position.line, position.character); // Copy position so start and end don't point to the same object
 	while (wordRange.start.character > 0 && !/\s/.test(line[wordRange.start.character - 1])) wordRange.start.character--; // Move the start of the range to the beginning of the word
 	while (wordRange.end.character < line.length && !/\s/.test(line[wordRange.end.character])) wordRange.end.character++; // Move the end of the range to the end of the word
 	return [line.slice(wordRange.start.character, wordRange.end.character), wordRange]; // Return the word and the range
@@ -144,7 +144,7 @@ export function populateLineNumber(completionList: CompletionList, lineNumber: n
  */
 export function populateRegisters(completionList: CompletionList) {
 	completionList.items.push({
-		label: `r0`,
+		label: 'r0',
 		labelDetails: { description: 'Always 0' },
 		kind: CompletionItemKind.Variable
 	});
@@ -157,17 +157,17 @@ export function populateRegisters(completionList: CompletionList) {
 		});
 	}
 	completionList.items.push({
-		label: `r13`,
+		label: 'r13',
 		labelDetails: { description: 'Return Value' },
 		kind: CompletionItemKind.Variable
 	});
 	completionList.items.push({
-		label: `r14`,
+		label: 'r14',
 		labelDetails: { description: 'Return Address' },
 		kind: CompletionItemKind.Variable
 	});
 	completionList.items.push({
-		label: `r15`,
+		label: 'r15',
 		labelDetails: { description: 'Stack Pointer' },
 		kind: CompletionItemKind.Variable
 	});

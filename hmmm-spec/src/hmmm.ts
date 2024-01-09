@@ -120,7 +120,7 @@ export let hmmmInstructions: HMMMInstruction[];
  * A map of instruction aliases to their actual names.
  * This map contains the aliases that are defined in the HMMM specification: https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/documentation.html
  */
-export let hmmmAliases = new Map<string, string>([
+export const hmmmAliases = new Map<string, string>([
 	['mov', 'copy'],
 	['jump', 'jumpr'],
 	['jeqz', 'jeqzn'],
@@ -619,7 +619,7 @@ export function strictParseInt(value: string | undefined, radix?: number): numbe
  * @returns The signed number.
  */
 export function s8IntToNumber(n: number): number {
-	if (n > 127) return n - 256
+	if (n > 127) return n - 256;
 	return n;
 }
 

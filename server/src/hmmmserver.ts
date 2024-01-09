@@ -48,15 +48,15 @@ import {
 //#region Language Server Setup
 
 // Create a connection for the server
-const connection = createConnection(ProposedFeatures.all)
+const connection = createConnection(ProposedFeatures.all);
 
 // Create a document manager to listen for changes to text documents and keep track of their source
 // The client will send various document sync events. This object listens for those events and updates
 // document objects so we can read them later
-let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument)
+const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 // When the client connects, tell it what we can do
-connection.onInitialize((params: InitializeParams) => {
+connection.onInitialize((_params: InitializeParams) => {
 	return {
 		// Tell the client what we can do
 		capabilities: {
@@ -114,7 +114,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 		Flag any lines that don't match this format
 	*/
 
-	let diagnostics: Diagnostic[] = [];
+	const diagnostics: Diagnostic[] = [];
 
 	// Create an array of ranges which are the full line. This is used as a default in some cases if the regex fails to match
 	const defaultIndices = Array(7).fill([uinteger.MIN_VALUE, uinteger.MAX_VALUE]);
@@ -124,7 +124,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
 	// Keep track of all jump destinations, so we can check if they're in the code segment
 	// Array of [destination address, range of the argument that contains the destination address in the source file (so we can highlight it)]
-	let jumpDestinations: Array<[number, Range]> = []
+	const jumpDestinations: Array<[number, Range]> = [];
 
 	for (let lineIdx = 0; lineIdx < textDocument.lineCount; lineIdx++) {
 		// Get the line and remove any comments
@@ -139,7 +139,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Error,
 				range: getRangeForLine(lineIdx),
-				message: `Invalid line!`,
+				message: 'Invalid line!',
 				source: 'HMMM Language Server',
 				data: 'invalid_line'
 			});
@@ -156,7 +156,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({ // Add an error diagnostic
 				severity: DiagnosticSeverity.Error,
 				range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][0] + 1),
-				message: `Missing line number`,
+				message: 'Missing line number',
 				source: 'HMMM Language Server',
 				data: 'missing_line_num'
 			});
@@ -178,7 +178,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				diagnostics.push({
 					severity: DiagnosticSeverity.Error,
 					range: Range.create(lineIdx, indices[InstructionPart.LINE_NUM][0], lineIdx, indices[InstructionPart.LINE_NUM][1]),
-					message: `Line number is out of range! HMMM programs can only have 256 lines of code`,
+					message: 'Line number is out of range! HMMM programs can only have 256 lines of code',
 					source: 'HMMM Language Server',
 					data: 'line_num_out_of_range'
 				});
@@ -202,7 +202,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				diagnostics.push({
 					severity: DiagnosticSeverity.Error,
 					range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-					message: `Invalid operand!`,
+					message: 'Invalid operand!',
 					source: 'HMMM Language Server',
 					data: 'invalid_operand'
 				});
@@ -210,7 +210,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				diagnostics.push({
 					severity: DiagnosticSeverity.Error,
 					range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-					message: `Invalid register! HMMM only supports registers r0-r15`,
+					message: 'Invalid register! HMMM only supports registers r0-r15',
 					source: 'HMMM Language Server',
 					data: 'invalid_register'
 				});
@@ -218,7 +218,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 				diagnostics.push({
 					severity: DiagnosticSeverity.Error,
 					range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-					message: `Invalid number! HMMM only supports numerical arguments from -128 to 127 (signed) or 0 to 255 (unsigned)`,
+					message: 'Invalid number! HMMM only supports numerical arguments from -128 to 127 (signed) or 0 to 255 (unsigned)',
 					source: 'HMMM Language Server',
 					data: 'invalid_number'
 				});
@@ -247,7 +247,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Error,
 				range: Range.create(lineIdx, indices[InstructionPart.OTHER][0], lineIdx, indices[InstructionPart.OTHER][1]),
-				message: `Unexpected token!`,
+				message: 'Unexpected token!',
 				source: 'HMMM Language Server',
 				data: 'unexpected_token'
 			});
@@ -260,7 +260,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Error,
 				range: Range.create(lineIdx, Math.max(0, indices[InstructionPart.LINE_NUM][1] - 1), lineIdx, indices[InstructionPart.LINE_NUM][1]),
-				message: `Expected instruction`,
+				message: 'Expected instruction',
 				source: 'HMMM Language Server',
 				data: 'missing_instruction'
 			});
@@ -275,7 +275,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Error,
 				range: Range.create(lineIdx, indices[InstructionPart.INSTRUCTION][0], lineIdx, indices[InstructionPart.INSTRUCTION][1]),
-				message: `Unknown instruction`,
+				message: 'Unknown instruction',
 				source: 'HMMM Language Server',
 				data: 'invalid_instruction'
 			});
@@ -373,7 +373,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Warning,
 				range,
-				message: `Jump destination is outside code segment`,
+				message: 'Jump destination is outside code segment',
 				source: 'HMMM Language Server',
 				data: 'jump_outside_cs'
 			});
@@ -390,7 +390,7 @@ connection.onCodeAction(
 			Suggest fixes for errors. Currently, this is only line numbers, but it could be expanded to other errors in the future (e.g. n vs r variants of instructions)
 		*/
 
-		let actions: CodeAction[] = [];
+		const actions: CodeAction[] = [];
 		params.context.diagnostics.forEach(diagnostic => {
 			if (diagnostic.source !== 'HMMM Language Server') return; // Only handle diagnostics from the HMMM Language Server
 
@@ -405,63 +405,63 @@ connection.onCodeAction(
 
 			switch (errorCode) {
 				case 'incorrect_line_num': // The line number is incorrect, so suggest changing it to the expected line number
-					{
-						const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
-						actions.push({
-							title: `Change Line Number to ${correctLineNum}`,
-							kind: CodeActionKind.QuickFix,
-							diagnostics: [diagnostic],
-							edit: {
-								changes: {
-									[params.textDocument.uri]: [TextEdit.replace(diagnostic.range, correctLineNum.toString())]
-								}
+				{
+					const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, document);
+					actions.push({
+						title: `Change Line Number to ${correctLineNum}`,
+						kind: CodeActionKind.QuickFix,
+						diagnostics: [diagnostic],
+						edit: {
+							changes: {
+								[params.textDocument.uri]: [TextEdit.replace(diagnostic.range, correctLineNum.toString())]
 							}
-						});
-						break;
-					}
+						}
+					});
+					break;
+				}
 				case 'missing_line_num': // The line number is missing, so suggest adding it
-					{
-						const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
-						actions.push({
-							title: 'Add Line Number',
-							kind: CodeActionKind.QuickFix,
-							diagnostics: [diagnostic],
-							edit: {
-								changes: {
-									[params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)) /* Replace the start of the line to the first non-space character */, correctLineNum.toString() + ' ')]
-								}
+				{
+					const correctLineNum = getExpectedInstructionNumber(diagnostic.range.start.line, documents.get(params.textDocument.uri)!);
+					actions.push({
+						title: 'Add Line Number',
+						kind: CodeActionKind.QuickFix,
+						diagnostics: [diagnostic],
+						edit: {
+							changes: {
+								[params.textDocument.uri]: [TextEdit.replace(Range.create(diagnostic.range.start.line, 0, diagnostic.range.end.line, line.search(/\S/)) /* Replace the start of the line to the first non-space character */, correctLineNum.toString() + ' ')]
 							}
-						});
-						break;
-					}
+						}
+					});
+					break;
+				}
 				case 'too_many_operands': // There are too many operands, so suggest removing the extra ones
-					{
-						actions.push({
-							title: 'Remove Extra Operands',
-							kind: CodeActionKind.QuickFix,
-							diagnostics: [diagnostic],
-							edit: {
-								changes: {
-									[params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
-								}
+				{
+					actions.push({
+						title: 'Remove Extra Operands',
+						kind: CodeActionKind.QuickFix,
+						diagnostics: [diagnostic],
+						edit: {
+							changes: {
+								[params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
 							}
-						});
-						break;
-					}
+						}
+					});
+					break;
+				}
 				case 'unexpected_token':
-					{
-						actions.push({
-							title: 'Remove Unexpected Token',
-							kind: CodeActionKind.QuickFix,
-							diagnostics: [diagnostic],
-							edit: {
-								changes: {
-									[params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
-								}
+				{
+					actions.push({
+						title: 'Remove Unexpected Token',
+						kind: CodeActionKind.QuickFix,
+						diagnostics: [diagnostic],
+						edit: {
+							changes: {
+								[params.textDocument.uri]: [TextEdit.del(diagnostic.range)]
 							}
-						});
-						break;
-					}
+						}
+					});
+					break;
+				}
 			}
 		});
 		return actions;
@@ -594,7 +594,7 @@ connection.onDefinition(
 
 		// Assume the number represents a line number that is being jumped to. Return all lines with a matching instruction number
 
-		let definitions: Definition = [];
+		const definitions: Definition = [];
 
 		for (let i = 0; i < document.lineCount; i++) { // Loop through all the lines in the document
 			// Get the line and remove anything that's not an instruction number
@@ -670,7 +670,7 @@ connection.onDocumentFormatting(
 			if (operand3Len > maxOperand3Len) maxOperand3Len = operand3Len;
 		}
 
-		let edits: TextEdit[] = [];
+		const edits: TextEdit[] = [];
 
 		// Loop through all the lines in the document again to format them
 		for (let i = 0; i < document.lineCount; i++) {
@@ -870,7 +870,7 @@ connection.onReferences(
 
 		// Find all lines which jump to the given line number
 
-		let locations: Location[] = [];
+		const locations: Location[] = [];
 
 		for (let i = 0; i < document.lineCount; i++) { // Loop through all the lines in the document
 			// Get the line and remove anything that's not an instruction number

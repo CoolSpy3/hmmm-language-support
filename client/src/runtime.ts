@@ -522,7 +522,7 @@ export class HMMMRuntime extends EventEmitter {
 		if (reverse) {
 			// If we're running in reverse, ensure that the instruction log is enabled (otherwise we have no idea what we previously executed)
 			if (!this._instructionLogEnabled) {
-				window.showErrorMessage(`Reverse Execution is not enabled`);
+				window.showErrorMessage('Reverse Execution is not enabled');
 				this.sendEvent('end');
 				return;
 			}
@@ -561,7 +561,7 @@ export class HMMMRuntime extends EventEmitter {
 		// Check for breakpoints/exceptions resulting from reads/writes caused by executing the instruction
 		if (this.checkAccesses()) return;
 
-		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
+		const [_binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
 		// Specific instructions can update these values if necessary. Otherwise, assume that the instruction has no side-effects
 
@@ -577,10 +577,11 @@ export class HMMMRuntime extends EventEmitter {
 				this.sendEvent('end');
 				return;
 			case 'read':
+			{
 				oldData = this._registers[rX!];
 				const input = strictParseInt(await window.showInputBox(<InputBoxOptions>{
 					placeHolder: `Enter a number to store into r${rX}`,
-					prompt: `You can also type any non-numerical text to terminate the program.`,
+					prompt: 'You can also type any non-numerical text to terminate the program.',
 					title: `HMMM: ${this.instructionPointer} ${decompileInstruction(instruction)}`
 				}) ?? '');
 				if (isNaN(input)) {
@@ -589,6 +590,7 @@ export class HMMMRuntime extends EventEmitter {
 				}
 				this.setRegister(rX!, input);
 				break;
+			}
 			case 'write':
 				this.instructionOutput('stdout', s16IntToNumber(this._registers[rX!]).toString());
 				break;
@@ -1198,7 +1200,7 @@ export class HMMMRuntime extends EventEmitter {
 		// If we failed to parse the instruction, we can't determine the accesses, so return an empty array
 		if (!parsedInstruction) return [];
 
-		const [binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
+		const [_binaryInstruction, instruction, rX, rY, rZ, N] = parsedInstruction;
 
 		const accesses: StateAccess[] = [];
 
@@ -1298,7 +1300,7 @@ export class HMMMRuntime extends EventEmitter {
 		// If no accesses were specified, determine them from the current instruction
 		if (!accesses) accesses = this.determineAccesses();
 
-		let hitBreakpoints: number[] = [];
+		const hitBreakpoints: number[] = [];
 
 		// For each access,
 		for (const access of accesses) {
@@ -1460,14 +1462,14 @@ export class HMMMRuntime extends EventEmitter {
 	 * @param event The name of the event to send
 	 * @param args The arguments to pass to the event
 	 */
-	private sendEvent(event: string, ...args: any[]) {
+	private sendEvent(event: string, ...args: unknown[]) {
 		if (event === 'stop' || event === 'stopOnBreakpoint') {
 			this._queuedInstructionExecution = undefined;
 		}
 		if (event === 'stopOnBreakpoint' || (args.length > 0 && args[0] === 'step')) {
 			this._ignoreBreakpoints = true;
 		}
-		setImmediate(_ => {
+		setImmediate(() => {
 			this.emit(event, ...args);
 		});
 	}

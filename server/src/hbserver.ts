@@ -2,21 +2,21 @@
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-    Diagnostic,
-    DiagnosticSeverity,
-    DocumentFormattingParams,
-    InitializeParams,
-    InlayHint,
-    InlayHintParams,
-    ProposedFeatures,
-    SemanticTokens,
-    SemanticTokensBuilder,
-    SemanticTokensParams,
-    TextDocumentSyncKind,
-    TextDocuments,
-    TextEdit,
-    createConnection,
-    uinteger
+	Diagnostic,
+	DiagnosticSeverity,
+	DocumentFormattingParams,
+	InitializeParams,
+	InlayHint,
+	InlayHintParams,
+	ProposedFeatures,
+	SemanticTokens,
+	SemanticTokensBuilder,
+	SemanticTokensParams,
+	TextDocumentSyncKind,
+	TextDocuments,
+	TextEdit,
+	createConnection,
+	uinteger
 } from 'vscode-languageserver/node';
 import { binaryRegex, decompileInstruction, formatBinaryNumber, parseBinaryInstruction } from '../../hmmm-spec/out/hmmm';
 import { applyTrailingNewlineEdits, getRangeForLine } from './helperfunctions';
@@ -28,7 +28,7 @@ const connection = createConnection(ProposedFeatures.all);
 // Create a document manager to listen for changes to text documents and keep track of their source
 // The client will send various document sync events. This object listens for those events and updates
 // document objects so we can read them later
-let documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 // When the client connects, tell it what we can do
 connection.onInitialize((params: InitializeParams) => {
@@ -39,7 +39,12 @@ connection.onInitialize((params: InitializeParams) => {
 			documentFormattingProvider: true,
 			inlayHintProvider: true,
 			semanticTokensProvider: {
-				legend: computeLegend(params.capabilities.textDocument?.semanticTokens!),
+				legend: computeLegend(params.capabilities.textDocument?.semanticTokens ?? {
+					tokenModifiers: [],
+					tokenTypes: [],
+					formats: [],
+					requests: {}
+				}),
 				full: true
 			}
 		}
@@ -61,7 +66,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 		Flag invalid instructions
 	*/
 
-	let diagnostics: Diagnostic[] = [];
+	const diagnostics: Diagnostic[] = [];
 
 	// For each line of the document
 	for (let i = 0; i < textDocument.lineCount; i++) {
@@ -96,11 +101,11 @@ connection.languages.inlayHint.on(
 		*/
 
 		// Get the document from the document manager
-		let document = documents.get(params.textDocument.uri);
+		const document = documents.get(params.textDocument.uri);
 
 		if (!document) return []; // If the document doesn't exist, return an empty array
 
-		let hints: InlayHint[] = [];
+		const hints: InlayHint[] = [];
 
 		// For each line of the document
 		for (let i = 0; i < document.lineCount; i++) {
@@ -132,7 +137,7 @@ connection.languages.semanticTokens.on(
 		*/
 
 		// Get the document from the document manager
-		let document = documents.get(params.textDocument.uri);
+		const document = documents.get(params.textDocument.uri);
 
 		const tokenBuilder = new SemanticTokensBuilder();
 
@@ -177,22 +182,22 @@ connection.languages.semanticTokens.on(
 			let hasNumericOperand = false;
 			switch (instruction.instruction.operand1) {
 				case 'register':
-					{
-						const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
-						tokenBuilder.push(i, m.indices[2][0], 4, tokenType, tokenModifier);
-						break;
-					}
+				{
+					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
+					tokenBuilder.push(i, m.indices[2][0], 4, tokenType, tokenModifier);
+					break;
+				}
 				case 'signed_number':
 				case 'unsigned_number':
-					{
-						hasNumericOperand = true;
-						// If the operand is a number, the first nibble is part of the opcode
-						tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
-						// and the last two nibbles are the number
-						tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
-						tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
-						break;
-					}
+				{
+					hasNumericOperand = true;
+					// If the operand is a number, the first nibble is part of the opcode
+					tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
+					// and the last two nibbles are the number
+					tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
+					tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+					break;
+				}
 				case undefined:
 				default:
 					// There is no operand 1, so the nibble part of the opcode
@@ -200,19 +205,19 @@ connection.languages.semanticTokens.on(
 			}
 			switch (instruction.instruction.operand2) {
 				case 'register':
-					{
-						const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[1].value);
-						tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
-						break;
-					}
+				{
+					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[1].value);
+					tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
+					break;
+				}
 				case 'signed_number':
 				case 'unsigned_number':
-					{
-						hasNumericOperand = true;
-						tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
-						tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
-						break;
-					}
+				{
+					hasNumericOperand = true;
+					tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
+					tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+					break;
+				}
 				case undefined:
 				default:
 					if (!hasNumericOperand) {
@@ -222,18 +227,18 @@ connection.languages.semanticTokens.on(
 			}
 			switch (instruction.instruction.operand3) {
 				case 'register':
-					{
-						const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[2].value);
-						tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
-						break;
-					}
+				{
+					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[2].value);
+					tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
+					break;
+				}
 				case 'signed_number':
 				case 'unsigned_number':
-					{
-						// Numbers are never the third operand, so this should never happen
-						console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);
-						break;
-					}
+				{
+					// Numbers are never the third operand, so this should never happen
+					console.error(`Unexpected number as third operand in instruction ${instruction.instruction.name}`);
+					break;
+				}
 				case undefined:
 				default:
 					if (!hasNumericOperand) {
@@ -254,11 +259,11 @@ connection.onDocumentFormatting(
 		*/
 
 		// Get the document from the document manager
-		let document = documents.get(params.textDocument.uri);
+		const document = documents.get(params.textDocument.uri);
 
 		if (!document) return []; // If the document doesn't exist, return an empty array
 
-		let edits: TextEdit[] = [];
+		const edits: TextEdit[] = [];
 
 		// For each line of the document
 		for (let i = 0; i < document.lineCount; i++) {

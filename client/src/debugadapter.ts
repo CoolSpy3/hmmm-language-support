@@ -126,7 +126,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Relays the capabilities of this debug adapter to the frontend.
 	 */
-	protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments): void {
+	protected initializeRequest(response: DebugProtocol.InitializeResponse, _args: DebugProtocol.InitializeRequestArguments): void {
 		// A reference to the debugging settings configured for the extension
 		const debuggingSettings = workspace.getConfiguration('hmmm.debugging');
 
@@ -191,7 +191,7 @@ export class HMMMDebugSession extends DebugSession {
 	/*
 	 * Sent by the frontend when all configuration requests have been sent by the frontend and the debug session can be started.
 	 */
-	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments): void {
+	protected configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, _args: DebugProtocol.ConfigurationDoneArguments): void {
 		// Side note: It doesn't seem like VSCode actually sends this request, but it's part of the protocol so I've included it anyway.
 
 		// Acknowledge that the request has been received
@@ -226,7 +226,7 @@ export class HMMMDebugSession extends DebugSession {
 			this._onConfigurationDone = undefined;
 
 			this._runtime.continue();
-		}
+		};
 
 		// Notify the frontend that we are ready to begin receiving configuration requests
 		// We waited until now to do this so that the runtime can be configured and we can know which files we're debugging
@@ -245,7 +245,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to continue execution of the program after it's stopped
 	 */
-	protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
+	protected continueRequest(response: DebugProtocol.ContinueResponse, _args: DebugProtocol.ContinueArguments): void {
 		// Acknowledge that the request has been received
 		this.sendResponse(response);
 
@@ -259,7 +259,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to continue execution of the program in reverse after it's stopped
 	 */
-	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, args: DebugProtocol.ReverseContinueArguments): void {
+	protected reverseContinueRequest(response: DebugProtocol.ReverseContinueResponse, _args: DebugProtocol.ReverseContinueArguments): void {
 		// Acknowledge that the request has been received
 		this.sendResponse(response);
 
@@ -273,7 +273,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to step forward one instruction in the program
 	 */
-	protected nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): void {
+	protected nextRequest(response: DebugProtocol.NextResponse, _args: DebugProtocol.NextArguments): void {
 		// Acknowledge that the request has been received
 		this.sendResponse(response);
 
@@ -287,7 +287,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to step backward one instruction in the program
 	 */
-	protected stepBackRequest(response: DebugProtocol.StepBackResponse, args: DebugProtocol.StepBackArguments): void {
+	protected stepBackRequest(response: DebugProtocol.StepBackResponse, _args: DebugProtocol.StepBackArguments): void {
 		// Acknowledge that the request has been received
 		this.sendResponse(response);
 
@@ -301,7 +301,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to pause the execution of the program
 	 */
-	protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments): void {
+	protected pauseRequest(response: DebugProtocol.PauseResponse, _args: DebugProtocol.PauseArguments): void {
 		// Acknowledge that the request has been received
 		this.sendResponse(response);
 
@@ -312,7 +312,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to step into a function call in the program
 	 */
-	protected stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): void {
+	protected stepInRequest(response: DebugProtocol.StepInResponse, _args: DebugProtocol.StepInArguments): void {
 		/*
 		 * Function calls aren't as well defined in HMMM as they are in other languages, so we'll just run until we execute a call instruction.
 		 */
@@ -330,7 +330,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to step out of a function call in the program
 	 */
-	protected stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): void {
+	protected stepOutRequest(response: DebugProtocol.StepOutResponse, _args: DebugProtocol.StepOutArguments): void {
 		/*
 		 * Function calls aren't as well defined in HMMM as they are in other languages, so we'll just run until we execute a jumpr instruction.
 		 */
@@ -366,9 +366,9 @@ export class HMMMDebugSession extends DebugSession {
 					line: this.convertDebuggerLineToClient(l),
 					column: this.convertDebuggerColumnToClient(0),
 					label: `Instruction ${instructionAddress}`
-				}
+				};
 			})
-		}
+		};
 
 		this.sendResponse(response);
 	}
@@ -452,7 +452,7 @@ export class HMMMDebugSession extends DebugSession {
 			this.sendResponse(response);
 			return;
 		}
-		const [frame, name, format] = parsedName;
+		const [_frame, name, format] = parsedName;
 
 		if (format) {
 			// If the variable is an interpreted value, we can't set a data breakpoint on it
@@ -505,7 +505,7 @@ export class HMMMDebugSession extends DebugSession {
 							id: this._runtime.setDataBreakpoint(address, 'memory', onRead, onWrite),
 							verified: true,
 							description: `Memory Address ${address}`
-						}
+						};
 					} else {
 						// If the breakpoint refers to a register check that the register is valid
 						const register = strictParseInt(bp.dataId.substring(1));
@@ -521,13 +521,13 @@ export class HMMMDebugSession extends DebugSession {
 							id: this._runtime.setDataBreakpoint(register, 'register', onRead, onWrite),
 							verified: true,
 							description: `Register ${register}`
-						}
+						};
 					}
 				}
 				// If the breakpoint does not refer to a valid data location, return a breakpoint with verified = false and a message explaining why
 				return <DebugProtocol.Breakpoint>{
 					verified: false,
-					message: `Data breakpoints can only be set on memory addresses and general purpose registers.`
+					message: 'Data breakpoints can only be set on memory addresses and general purpose registers.'
 				};
 			})
 		};
@@ -781,7 +781,7 @@ export class HMMMDebugSession extends DebugSession {
 	/**
 	 * Sent by the frontend to retrieve information about the last exception that occurred in the program
 	 */
-	protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments): void {
+	protected exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, _args: DebugProtocol.ExceptionInfoArguments): void {
 		// Get the last exception that occurred in the program
 		const [exceptionId, description] = this._runtime.getLastException();
 

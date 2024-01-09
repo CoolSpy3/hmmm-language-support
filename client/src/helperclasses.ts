@@ -1,11 +1,11 @@
 import {
-    DebugAdapterDescriptor,
-    DebugAdapterDescriptorFactory,
-    DebugAdapterInlineImplementation,
-    DebugConfiguration,
-    DebugConfigurationProvider,
-    DebugSession,
-    ProviderResult
+	DebugAdapterDescriptor,
+	DebugAdapterDescriptorFactory,
+	DebugAdapterInlineImplementation,
+	DebugConfiguration,
+	DebugConfigurationProvider,
+	DebugSession,
+	ProviderResult
 } from 'vscode';
 import { HMMMDebugSession } from './debugadapter';
 
