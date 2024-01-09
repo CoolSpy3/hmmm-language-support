@@ -222,7 +222,12 @@ The "names" of memory addresses are shown in base 10.
 
 In addition to the registers and memory locations, the variables view also contains a `pc` variable which shows the value of the program counter (instruction pointer) and a `ir` variable which shows the value of the instruction register (the currently highlighted instruction).
 
-The user can edit the values of (most) registers and memory locations (the exceptions are the program counter, the instruction register, and `r0`) by double clicking on the value and entering a new value.
+##### Hovers
+When the user hovers over a register or memory location in the source code, the extension will show the value of the register or memory location along with the various representations of the value.
+
+##### Modifying Variables
+
+The user can edit the values of (most) registers and memory locations (the exceptions are the `pc`, `ir`, and `r0`) by double clicking on the value and entering a new value.
 
 New values can be entered in decimal, hexadecimal, or binary. Negative numbers can only be entered in decimal. If you want to enter a negative number in hexadecimal or binary, you must enter the two's complement representation of the number.
 
@@ -252,7 +257,7 @@ The debugger provides several "exceptions" which will be thrown when it encounte
 
 Each exception is classified as either "Critical" or "Non-Critical". An exception is considered critical if the debugger cannot recover from it. By contrast, a non-critical exception represents a likely-error that can be ignored.
 
-When an exception is thrown, the debugger will pause execution, highlight the instruction that caused the exception, and show a message describing the exception. The user can then inspect the machine state to determine what caused the error. (They can also use the [variables view](#variables) to modify the machine state and resolve the error, but ultimately, the bug should be fixed in code.) In the case of non-critical exceptions, the user can choose to ignore the exception by pressing the "Continue" button in the [debug toolbar](#debug-actions).
+When an exception is thrown, the debugger will pause execution, highlight the instruction that caused the exception, and show a message describing the exception. The user can then inspect the machine state to determine what caused the error. (They can also use the [variables view](#modifying-variables) to modify the machine state and resolve the error, but ultimately, the bug should be fixed in code.) In the case of non-critical exceptions, the user can choose to ignore the exception by pressing the "Continue" button in the [debug toolbar](#debug-actions).
 
 Each exception can be enabled or disabled individually. If a non-critical exception is encountered while it is disabled, the debugger will ignore the exception and continue execution. If a critical exception is encountered while it is disabled, the debugger will print an error to the [debug console](#write) and halt execution.
 
