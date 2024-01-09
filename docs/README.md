@@ -125,7 +125,7 @@ By default, the debugger will attempt to run the currently open file as a HMMM a
 
 #### Creating a manual launch configuration
 Alternatively, you can also create a VSCode launch configuration to debug HMMM files. The basic syntax for a launch configuration is:
-``` json
+``` jsonc
 {
 	// Identifies the HMMM debugger (Required)
 	"type": "hmmm",
