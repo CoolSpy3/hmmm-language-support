@@ -157,7 +157,7 @@ export class HMMMDebugSession extends DebugSession {
 				filter: 'invalid-instruction',
 				label: 'Invalid Instruction',
 				default: true,
-				description: 'Breaks if the program attempts to execute a memory address that does not contain a valid instruction.'
+				description: 'Breaks if the program attempts to execute a memory address that contains an invalid instruction.'
 			},
 			{
 				filter: 'invalid-memory-access',
@@ -168,7 +168,7 @@ export class HMMMDebugSession extends DebugSession {
 			{
 				filter: 'cs-read',
 				label: 'Code Segment Read',
-				default: false,
+				default: true,
 				description: 'Breaks if the program attempts to read from an address inside the code segment.'
 			},
 			{

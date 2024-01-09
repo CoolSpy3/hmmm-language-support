@@ -157,7 +157,7 @@ In addition to the features documented in the VSCode Debugging Documentation, th
 * **Step Back** - This will step backwards one instruction
 * **Reverse** - This will reverse the execution of the program until the next breakpoint or until the beginning of the program is reached
 
-(These features have some additional limitations which are not present on the other features. See [the next section](#limitations-on-step-back-and-reverse) for more information.)
+(These features have some additional limitations which are not present on the other features. See the [Limitations on **Step Back** and **Reverse** section](#limitations-on-step-back-and-reverse) for more information.)
 
 Because functions are not as well defined as functions in other languages, the behavior of the **Step Into** and **Step Out** features is slightly different than in other languages.
 
@@ -170,6 +170,9 @@ Note that both of these features will execute the `calln` or `jumpr` instruction
 Whenever the debugger stops, it will highlight the *next* instruction that will be executed if the debugger continues forward. This is true for both forward and reverse execution. A side effect of this is that during forward execution, the highlighted instruction will be executed next, but during reverse execution, the highlighted instruction will be the instruction that was just "undone".
 
 If the memory address of the instruction does not correspond to a line in the source file, no line will be highlighted.
+
+##### Goto
+The user can force the debugger to goto a specific line by right clicking on the line and selecting `Jump to Cursor` while the program is paused. This will cause the runtime to jump to the selected line (creating a [stack frame](#the-call-stack) in the process).
 
 ##### Limitations on **Step Back** and **Reverse**
 Because instructions in HMMM can overwrite the values of registers and memory as well as modify the code of the program, the **Step Back** and **Reverse** features are not as robust as the other execution features.
@@ -236,3 +239,33 @@ Values which are longer than 16 bits will have their high-order bits truncated.
 
 #### Watch Expressions
 The user can also view the values of specific registers and memory locations in the watch view. Names are case-insensitive and can be any of the names shown in the variables view. Additionally, the user can enter a base-10 number to view the value of a specific memory location.
+
+#### Data Breakpoints
+The user can set data breakpoints on all registers and memory locations (except `pc`, `ir`, and `r0`). To set a data breakpoint, right-click on the register or memory location in the variables view and select `Break on Value Read`, `Break on Value Change`, or `Break on Value Access`. (You must click on variable itself. Clicking on one of the representations will not work.)
+
+* **Break on Value Read** - The debugger will pause execution when it encounters an instruction will read the value of the register or memory location is read. (This does not include memory address reads resulting from loading the instruction from memory.)
+* **Break on Value Change** - The debugger will pause execution when it encounters an instruction which will change the value of the register or memory location.
+* **Break on Value Access** - The debugger will pause execution when it encounters an instruction which will either read or change the value of the register or memory location.
+
+#### Exceptions
+The debugger provides several "exceptions" which will be thrown when it encounters problems (or potential problems) with the program.
+
+Each exception is classified as either "Critical" or "Non-Critical". An exception is considered critical if the debugger cannot recover from it. By contrast, a non-critical exception represents a likely-error that can be ignored.
+
+When an exception is thrown, the debugger will pause execution, highlight the instruction that caused the exception, and show a message describing the exception. The user can then inspect the machine state to determine what caused the error. (They can also use the [variables view](#variables) to modify the machine state and resolve the error, but ultimately, the bug should be fixed in code.) In the case of non-critical exceptions, the user can choose to ignore the exception by pressing the "Continue" button in the [debug toolbar](#debug-actions).
+
+Each exception can be enabled or disabled individually. If a non-critical exception is encountered while it is disabled, the debugger will ignore the exception and continue execution. If a critical exception is encountered while it is disabled, the debugger will print an error to the [debug console](#write) and halt execution.
+
+Exception List:
+| Exception | Critical? | Description |
+| --- | --- | --- |
+| **Invalid Instruction** | Yes | The program attempted to execute a memory address that contains an invalid HMMM instruction. |
+| **Invalid Memory Access** | Yes | An instruction attempted to access a memory address that does not exist. |
+| **Code Segment Read** | No | An instruction attempted to read from the code segment. |
+| **Code Segment Write** | No | An instruction attempted to write to the code segment. |
+| **Execute Outside Code Segment** | No | The program attempted to execute an instruction that is outside of the code segment. |
+
+In case you are not familiar with the term, the code segment is the part of memory which contains the program's instructions. In HMMM, the code segment should only refer to the instructions loaded from the source code. There are use cases where the code segment must be read or modified, and instructions outside the code segment must be executed (such as in self-modifying code), but for most HMMM programs, these actions should be considered errors.
+
+## Building Code
+The extension provides the ability to build HMMM binary files from HMMM assembly files. This can be accessed by accessing the Command Palette (`Ctrl+Shift+P`) and selecting `HMMM: Build Program`. This will attempt to build the currently open file. The user will be prompted to select a location to save the file.
