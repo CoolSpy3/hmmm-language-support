@@ -1,10 +1,11 @@
+*
 .vscode
 node_modules
-./*
 !CHANGELOG.md
 !LICENSE
 !package.json
 !package-lock.json
 !README.md
 !dist
+!dist/**/*
 dist/**/*.map
