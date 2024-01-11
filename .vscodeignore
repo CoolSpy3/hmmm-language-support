@@ -1,11 +1,20 @@
+# Ignore everything
 *
 */
+
+# And these directories if they appear in subdirectories
 .vscode
 node_modules
+
+# Except these files
 !CHANGELOG.md
 !LICENSE
 !package.json
 !package-lock.json
 !README.md
+
+# And these directories
 !dist
 !dist/**/*
+!syntaxes
+!syntaxes/**/*

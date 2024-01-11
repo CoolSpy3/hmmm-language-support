@@ -1,5 +1,8 @@
 # Change Log
 
+## 2.0.1
+- Fix bug where the language syntax files were not packaged with the extension
+
 ## 2.0.0
 - Add support for HMMM Binary (`.hb`) files
 	- Add semantic highlighting of instructions
