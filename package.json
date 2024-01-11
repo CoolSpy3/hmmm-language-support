@@ -25,13 +25,12 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run esbuild-base -- --minify",
-		"compile": "tsc -b",
-		"watch": "tsc -b -w",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
 		"postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
 		"test": "vscode-test",
-		"esbuild-base": "esbuild ./client/src/extension.ts ./server/src/hbserver.ts ./server/src/hmmmserver.ts --bundle --outdir=dist/ --external:vscode --format=cjs --platform=node",
+		"build:hmmm-spec": "tsc -p ./hmmm-spec/tsconfig.json",
+		"esbuild-base": "npm run build:hmmm-spec && esbuild ./client/src/extension.ts ./server/src/hbserver.ts ./server/src/hmmmserver.ts --bundle --outdir=dist/ --external:vscode --format=cjs --platform=node",
 		"esbuild": "npm run esbuild-base -- --sourcemap",
 		"esbuild-watch": "npm run esbuild-base -- --sourcemap --watch"
 	},
