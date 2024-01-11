@@ -84,7 +84,7 @@
 				"hmmm.debugging.stackFrameDepth": {
 					"type": "number",
 					"default": 500000,
-					"description": "The maximum number of instructions that can be executed when stepping through a stack frame"
+					"description": "The maximum number of stack frames that will be stored when debugging HMMM programs"
 				}
 			}
 		},
