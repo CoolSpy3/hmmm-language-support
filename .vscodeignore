@@ -1,5 +1,10 @@
-.vscode/**
-.vscode-test/**
-.gitignore
-vsc-extension-quickstart.md
-tsconfig.json
+.vscode
+node_modules
+./*
+!CHANGELOG.md
+!LICENSE
+!package.json
+!package-lock.json
+!README.md
+!dist
+dist/**/*.map

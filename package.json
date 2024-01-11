@@ -4,7 +4,7 @@
 	"description": "A HMMM Syntax Highlighter, Debugger, Linter, and Formatter",
 	"version": "2.0.0",
 	"publisher": "CoolSpy3",
-	"main": "./client/out/extension.js",
+	"main": "./dist/client/src/extension.js",
 	"categories": [
 		"Programming Languages",
 		"Debuggers",
@@ -24,13 +24,16 @@
 		"vscode": "^1.85.0"
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run compile",
+		"vscode:prepublish": "npm run esbuild-base -- --minify",
 		"compile": "tsc -b",
 		"watch": "tsc -b -w",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
 		"postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
-		"test": "vscode-test"
+		"test": "vscode-test",
+		"esbuild-base": "esbuild ./client/src/extension.ts ./server/src/hbserver.ts ./server/src/hmmmserver.ts --bundle --outdir=dist/ --external:vscode --format=cjs --platform=node",
+		"esbuild": "npm run esbuild-base -- --sourcemap",
+		"esbuild-watch": "npm run esbuild-base -- --sourcemap --watch"
 	},
 	"activationEvents": [
 		"onDebugResolve:hb",
@@ -41,7 +44,9 @@
 	"devDependencies": {
 		"@typescript-eslint/eslint-plugin": "^6.18.1",
 		"@typescript-eslint/parser": "^6.18.1",
-		"eslint": "^8.56.0"
+		"esbuild": "^0.19.11",
+		"eslint": "^8.56.0",
+		"typescript": "^5.3.3"
 	},
 	"contributes": {
 		"breakpoints": [

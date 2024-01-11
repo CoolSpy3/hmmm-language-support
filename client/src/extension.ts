@@ -30,8 +30,8 @@ let hmmmClient: LanguageClient;
 export function activate(context: ExtensionContext) {
 	// Start the language servers
 	{
-		const hbServerModule = context.asAbsolutePath(join('server', 'out', 'hbserver.js'));
-		const hmmmServerModule = context.asAbsolutePath(join('server', 'out', 'hmmmserver.js'));
+		const hbServerModule = context.asAbsolutePath(join('dist', 'server', 'src', 'hbserver.js'));
+		const hmmmServerModule = context.asAbsolutePath(join('dist', 'server', 'src', 'hmmmserver.js'));
 
 		// Server options
 		const hbServerOptions: ServerOptions = {

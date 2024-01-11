@@ -14,14 +14,12 @@
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
 			"outFiles": [
-				"${workspaceFolder}/**/out/**/*.js",
-				"${workspaceFolder}/**/out/**/*.js.map",
-				"${workspaceFolder}/**/src/**/*.ts"
+				"${workspaceFolder}/dist/**/*",
 			],
 			"autoAttachChildProcesses": true,
 			"preLaunchTask": {
 				"type": "npm",
-				"script": "watch"
+				"script": "esbuild-watch"
 			}
 		}
 	]

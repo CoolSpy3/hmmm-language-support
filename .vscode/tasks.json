@@ -28,6 +28,34 @@
 			"problemMatcher": [
 				"$tsc-watch"
 			]
+		},
+		{
+			"type": "npm",
+			"script": "esbuild",
+			"group": "build",
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "never"
+			},
+			"problemMatcher": [
+				"$ts-esbuild"
+			]
+		},
+		{
+			"type": "npm",
+			"script": "esbuild-watch",
+			"isBackground": true,
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "never"
+			},
+			"problemMatcher": [
+				"$ts-esbuild-watch"
+			]
 		}
 	]
 }
