@@ -1,5 +1,8 @@
 # Change Log
 
+## 2.0.2
+- Fix stack frame length setting description
+
 ## 2.0.1
 - Fix bug where the language syntax files were not packaged with the extension
 
