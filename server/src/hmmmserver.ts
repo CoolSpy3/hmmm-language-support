@@ -1,48 +1,48 @@
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-	CodeAction,
-	CodeActionKind,
-	CodeActionParams,
-	CompletionList,
-	CompletionParams,
-	Definition,
-	DefinitionParams,
-	Diagnostic,
-	DiagnosticSeverity,
-	DocumentFormattingParams,
-	Hover,
-	HoverParams,
-	InitializeParams,
-	Location,
-	MarkupKind,
-	ProposedFeatures,
-	Range,
-	ReferenceParams,
-	TextDocumentSyncKind,
-	TextDocuments,
-	TextEdit,
-	createConnection,
-	uinteger
+    CodeAction,
+    CodeActionKind,
+    CodeActionParams,
+    CompletionList,
+    CompletionParams,
+    Definition,
+    DefinitionParams,
+    Diagnostic,
+    DiagnosticSeverity,
+    DocumentFormattingParams,
+    Hover,
+    HoverParams,
+    InitializeParams,
+    Location,
+    MarkupKind,
+    ProposedFeatures,
+    Range,
+    ReferenceParams,
+    TextDocumentSyncKind,
+    TextDocuments,
+    TextEdit,
+    createConnection,
+    uinteger
 } from 'vscode-languageserver/node';
 import {
-	HMMMDetectedOperandType,
-	HMMMInstruction,
-	HMMMOperandType,
-	InstructionPart,
-	getInstructionByName,
-	instructionRegex,
-	isJumpInstruction,
-	preprocessLine,
-	strictParseInt,
-	validateOperand
+    HMMMDetectedOperandType,
+    HMMMInstruction,
+    HMMMOperandType,
+    InstructionPart,
+    getInstructionByName,
+    instructionRegex,
+    isJumpInstruction,
+    preprocessLine,
+    strictParseInt,
+    validateOperand
 } from '../../hmmm-spec/out/hmmm';
 import {
-	applyTrailingNewlineEdits,
-	getExpectedInstructionNumber,
-	getRangeForLine,
-	getSelectedWord,
-	isInIndexRange, populateInstructions, populateLineNumber, populateRegisters,
-	preprocessDocumentLine,
+    applyTrailingNewlineEdits,
+    getExpectedInstructionNumber,
+    getRangeForLine,
+    getSelectedWord,
+    isInIndexRange, populateInstructions, populateLineNumber, populateRegisters,
+    preprocessDocumentLine,
 } from './helperfunctions';
 
 //#region Language Server Setup
@@ -790,6 +790,8 @@ connection.onHover(
 		}
 
 		if (/^r(\d|1[0-5])$/i.test(word[0])) { // Try to interpret the word as a register
+            word[0] = word[0].toLowerCase();
+
 			// Show the register description
 			if (word[0] === 'r0') {
 				return {
