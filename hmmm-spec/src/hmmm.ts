@@ -274,17 +274,29 @@ export function isJumpInstruction(instr?: string): boolean {
 //#region Binary
 
 /**
- * A regular expression that matches a binary string containing 4 nibbles optionally separated/surrounded by spaces
+ * A regular expression that matches an arbitrary number of spaces and then captures a binary nibble, optionally containing more spaces
  */
-export const binaryRegex = /^\s*([01]{4})\s*([01]{4})\s*([01]{4})\s*([01]{4})/d;
+export const nibbleRegex = /\s*((?:\s*[01]){4})/;
+
+/**
+ * A regular expression that matches a binary string containing 4 nibbles optionally separated/surrounded by or containing spaces
+ */
+export const binaryRegex = RegExp(`${nibbleRegex.source}${nibbleRegex.source}${nibbleRegex.source}${nibbleRegex.source}\\s*`, 'd');
 
 /**
  * Formats a binary number by adding spaces every 4 characters, padding it to 16 bits, and trimming any extra whitespace
  * @param line The binary number to format
+ * @param pad Whether or not to pad the number to 16 bits (This should be true for automatically formatted numbers, but false for user input)
  * @returns The formatted binary number
  */
-export function formatBinaryNumber(line: string): string {
-	return line.padStart(16, '0').replace(binaryRegex, '$1 $2 $3 $4');
+export function formatBinaryNumber(line: string, pad: boolean): string {
+	line = line.replaceAll(/[^01]/g, ''); // Remove all non-binary characters
+
+	if(pad) line = line.padStart(16, '0'); // Pad the number to 16 bits
+
+	line = line.replace(binaryRegex, '$1 $2 $3 $4'); // Add spaces every 4 characters
+
+	return line;
 }
 
 //#endregion
@@ -527,7 +539,7 @@ export function compile(code: string[]): [string[], Map<number, number>] | undef
 		} else if (m[InstructionPart.OPERAND3]) return undefined; // An operand was provided, but the instruction does not accept an operand!
 
 		// Add the binary representation of the instruction to the output
-		compiledCode.push(formatBinaryNumber(binary.toString(2)));
+		compiledCode.push(formatBinaryNumber(binary.toString(2), true));
 	}
 
 	return [compiledCode, lineMap];

@@ -916,7 +916,7 @@ export class HMMMDebugSession extends DebugSession {
 				numChildren = 0;
 			} else if (format === 'binary') {
 				displayName = 'Binary Value';
-				stringValue = formatBinaryNumber(value.toString(2));
+				stringValue = formatBinaryNumber(value.toString(2), true);
 				numChildren = 0;
 			} else if (format === 'signed') {
 				displayName = 'Signed Value';

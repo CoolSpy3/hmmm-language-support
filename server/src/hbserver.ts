@@ -88,6 +88,9 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			});
 		}
 	}
+
+	// Send the diagnostics to the client
+	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
 documents.onDidChangeContent(change => {
@@ -143,6 +146,17 @@ connection.languages.semanticTokens.on(
 
 		if (!document) return tokenBuilder.build(); // If the document doesn't exist, don't return any tokens
 
+		/**
+		 * Adds a token to the token builder
+		 * @param line The line the token is on
+		 * @param range The characters that are part of the token
+		 * @param type The type of the token
+		 * @param modifiers The modifiers for the token (defaults to 0)
+		 */
+		function createToken(line: number, range: [number, number], type: number, modifiers: number = 0): void {
+			tokenBuilder.push(line, range[0], range[1] - range[0], type, modifiers);
+		}
+
 		// For each line of the document
 		for (let i = 0; i < document.lineCount; i++) {
 			const line = document.getText(getRangeForLine(i));
@@ -158,8 +172,7 @@ connection.languages.semanticTokens.on(
 
 			// Highlight the instruction
 
-			// The first nibble is always part of the opcode
-			tokenBuilder.push(i, m.indices[1][0], 4, TokenTypes.keyword, 0);
+			createToken(i, m.indices[1], TokenTypes.keyword);
 
 			/**
 			 * Gets the token type and modifiers for a register
@@ -184,7 +197,7 @@ connection.languages.semanticTokens.on(
 				case 'register':
 				{
 					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[0].value);
-					tokenBuilder.push(i, m.indices[2][0], 4, tokenType, tokenModifier);
+					createToken(i, m.indices[2], tokenType, tokenModifier);
 					break;
 				}
 				case 'signed_number':
@@ -192,44 +205,44 @@ connection.languages.semanticTokens.on(
 				{
 					hasNumericOperand = true;
 					// If the operand is a number, the first nibble is part of the opcode
-					tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
+					createToken(i, m.indices[2], TokenTypes.keyword);
 					// and the last two nibbles are the number
-					tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
-					tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+					createToken(i, m.indices[3], TokenTypes.number);
+					createToken(i, m.indices[4], TokenTypes.number);
 					break;
 				}
 				case undefined:
 				default:
 					// There is no operand 1, so the nibble part of the opcode
-					tokenBuilder.push(i, m.indices[2][0], 4, TokenTypes.keyword, 0);
+					createToken(i, m.indices[2], TokenTypes.keyword);
 			}
 			switch (instruction.instruction.operand2) {
 				case 'register':
 				{
 					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[1].value);
-					tokenBuilder.push(i, m.indices[3][0], 4, tokenType, tokenModifier);
+					createToken(i, m.indices[3], tokenType, tokenModifier);
 					break;
 				}
 				case 'signed_number':
 				case 'unsigned_number':
 				{
 					hasNumericOperand = true;
-					tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.number, 0);
-					tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.number, 0);
+					createToken(i, m.indices[3], TokenTypes.number);
+					createToken(i, m.indices[4], TokenTypes.number);
 					break;
 				}
 				case undefined:
 				default:
 					if (!hasNumericOperand) {
 						// There is no operand 2, so the nibble part of the opcode
-						tokenBuilder.push(i, m.indices[3][0], 4, TokenTypes.keyword, 0);
+						createToken(i, m.indices[3], TokenTypes.keyword);
 					}
 			}
 			switch (instruction.instruction.operand3) {
 				case 'register':
 				{
 					const [tokenType, tokenModifier] = getRegisterTokenType(instruction.operands[2].value);
-					tokenBuilder.push(i, m.indices[4][0], 4, tokenType, tokenModifier);
+					createToken(i, m.indices[4], tokenType, tokenModifier);
 					break;
 				}
 				case 'signed_number':
@@ -243,7 +256,7 @@ connection.languages.semanticTokens.on(
 				default:
 					if (!hasNumericOperand) {
 						// There is no operand 3, so the nibble part of the opcode
-						tokenBuilder.push(i, m.indices[4][0], 4, TokenTypes.keyword, 0);
+						createToken(i, m.indices[4], TokenTypes.keyword);
 					}
 			}
 		}
@@ -272,7 +285,7 @@ connection.onDocumentFormatting(
 			if (!line) continue; // Skip empty lines
 
 			// Format the line
-			const formattedLine = formatBinaryNumber(line);
+			const formattedLine = formatBinaryNumber(line, false);
 
 			// If formatting the line changed it, add an edit to make the change
 			if (line !== formattedLine) edits.push({
