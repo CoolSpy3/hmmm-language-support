@@ -86,8 +86,6 @@ The [HMMM Specification](https://www.cs.hmc.edu/~cs5grad/cs5/hmmm/documentation/
 
 This conforms to the format of code outputted by the CS5 HMMM assembler.
 
-At some point, I would like to discuss with the CS5 professors to verify these assumptions.
-
 #### Code Validation
 The extension will attempt to validate code in HMMM binary files and will highlight any invalid lines. Because the HMMM Binary format represents compiled code, it is more difficult to determine the user's intent when invalid code is found. As a result, this extension does not provided detailed error information or quick fixes for HMMM Binary files.
 
