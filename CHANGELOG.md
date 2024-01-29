@@ -1,5 +1,10 @@
 # Change Log
 
+## 2.0.3
+- Fix a bug where special registers do not show the correct hover text if they are capitalized
+- Fix HMMM Binary formatter and semantic highlighting not working on lines with weird spacing
+- Fix a bug causing errors to not be reported in HMMM binary files
+
 ## 2.0.2
 - Fix stack frame length setting description
 

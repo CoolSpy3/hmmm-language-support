@@ -2,7 +2,7 @@
 	"name": "hmmm-language-client",
 	"description": "Language client for HMMM",
 	"publisher": "CoolSpy3",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/CoolSpy3/hmmm-language-support"

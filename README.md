@@ -66,6 +66,6 @@ This is a quick bullet list of the features provided by this extension. For a de
 
 ## Known Issues
 
-None as of writing :D
+- Many HMMM instructions have associated aliases or binary encodings which are synonymous with other instructions. Several parts of this extension attempt to disassemble compiled HMMM code and cannot differentiate between these synonymous instructions. In these cases, the extension will attempt to "guess" the most common disassembly. The disassembled instructions will always have a meaning synonymous with the original instruction even if they are not the same.
 
 *For more up-to-date information, see the [issues page](https://github.com/CoolSpy3/hmmm-language-support/issues).*
