@@ -24,7 +24,7 @@
 		"vscode": "^1.85.0"
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run esbuild-base -- --minify",
+		"vscode:prepublish": "npm run lint && npm run esbuild-base -- --minify",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint ./client/src ./hmmm-spec/src ./server/src --ext .ts,.tsx",
 		"postinstall": "cd client && npm install && cd ../hmmm-spec && npm install && cd ../server && npm install",
