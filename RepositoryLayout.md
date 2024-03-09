@@ -20,7 +20,7 @@ This document highlights the general layout of the repository and the purpose of
   |  \- src/
   |     \- hmmm.ts  # All the code for the library is located in this file
   |
-  |- server/  # VSCode server-side code (Extension initialization and debugger)
+  |- server/  # VSCode server-side code (Language Servers)
   |  \- src/
   |     |- hbserver.ts         # Implements the Language Server Protocol (LSP) for HMMM Binary files
   |     |- helperfunctions.ts  # Defines helper functions for implementing the LSP and
