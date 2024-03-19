@@ -715,7 +715,7 @@ connection.onDocumentFormatting(
 			/* What follows is some somewhat confusing formatting code. I'll try to explain it as best I can:
 			 * For each part of the instruction (line number/instruction/operands), we want to write the part
 			 * (padded to the max length). Then, we need another space before the next part, however,
-			 * we don't want to add a space if  the next part will not be included (in any instruction).
+			 * we don't want to add a space if the next part will not be included (in any instruction).
 			 * The reason for this is as follows:
 			 * If we have the code:
 			 * 0 setn r1 1 # Set r1 to 1
