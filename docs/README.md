@@ -151,7 +151,7 @@ When the debugger encounters a `read` instruction, it will prompt the user to en
 When the debugger encounters a `write` instruction, it will print the value of the register or memory location to the debug console in base-10. To view the debug console (if it is not already open) goto `View > Debug Console` or press `Ctrl+Shift+Y`.
 
 #### Debug Actions
-See the [Debug Actions section of the VSCode Debugging Documentation#](https://code.visualstudio.com/docs/editor/debugging#_debug-actions) for more information on how to use these features.
+See the [Debug Actions section of the VSCode Debugging Documentation](https://code.visualstudio.com/docs/editor/debugging#_debug-actions) for more information on how to use these features.
 
 In addition to the features documented in the VSCode Debugging Documentation, the HMMM debugger also adds two more buttons to the debug toolbar:
 * **Step Back** - This will step backwards one instruction
@@ -179,7 +179,7 @@ Because instructions in HMMM can overwrite the values of registers and memory as
 
 They both rely on a stack which is internally known as the Instruction Log to store the state of the program at each instruction (This is a stack in the sense that it is a stack data structure. When the "stack" is referenced in other parts of this documentation, it is referring to the [Call Stack](#the-call-stack) not the Instruction log.)
 
-Because certain programs such as infinite loops can cause the instruction log to grow very large, the instruction log is (by default) limited to two million entries. This means that execution can only be reversed for two million instructions. If the instruction log grows larger than this, the debugger will print a warning, *but will not stop execution*. The debugger will then begin to discard the oldest entries in the instruction log as new ones are added. As are result, the program will no longer be able to be reversed to the beginning of the program. (An instruction log entry is also created when a [goto](TODO) is executed.)
+Because certain programs such as infinite loops can cause the instruction log to grow very large, the instruction log is (by default) limited to two million entries. This means that execution can only be reversed for two million instructions. If the instruction log grows larger than this, the debugger will print a warning, *but will not stop execution*. The debugger will then begin to discard the oldest entries in the instruction log as new ones are added. As are result, the program will no longer be able to be reversed to the beginning of the program. (An instruction log entry is also created when a [goto](#goto) is executed.)
 
 This limit can be changed by setting the `hmmm.debugging.reverseExecutionDepth` setting to a different value. Setting this value to `0` or a negative number will remove the limit entirely. (Note that this may cause the debugger to run out of memory if the program executes for long enough and is not recommended.)
 
@@ -191,7 +191,7 @@ See the [Breakpoints section of the VSCode Debugging Documentation](https://code
 Conditional breakpoints and logpoints are not currently supported.
 
 #### The Call Stack
-The call stack is shown at the bottom of the debug view when the program is paused. A new stack frame is created whenever a jump is taken (this includes all jump instructions such as `jeqzn` as well as `calln`) as well as whenever a [goto](TODO) is executed. A stack frame is not created when a jump is not taken. For example, in the following code, because the conditional jump to instruction 3 is not taken, no stack frames are created:
+The call stack is shown at the bottom of the debug view when the program is paused. A new stack frame is created whenever a jump is taken (this includes all jump instructions such as `jeqzn` as well as `calln`) as well as whenever a [goto](#goto) is executed. A stack frame is not created when a jump is not taken. For example, in the following code, because the conditional jump to instruction 3 is not taken, no stack frames are created:
 ``` hmmm
 0 setn  r1 1
 1 jeqzn r1 3
