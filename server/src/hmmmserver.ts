@@ -305,7 +305,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 								diagnostics.push({ // The instruction expects a register, but the operand is not a register
 									severity: DiagnosticSeverity.Error,
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-									message: `${instruction.name} expects a register as operand 1`,
+									message: `${instruction.name} expects a register here`,
 									source: 'HMMM Language Server',
 									data: 'invalid_operand_type'
 								});
@@ -316,7 +316,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 								diagnostics.push({ // The instruction expects a signed number, but the operand is not a signed number
 									severity: DiagnosticSeverity.Error,
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
+									message: `${instruction.name} expects a signed number (-128 to 127) here`,
 									source: 'HMMM Language Server',
 									data: 'invalid_operand_type'
 								});
@@ -327,7 +327,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 								diagnostics.push({ // The instruction expects an unsigned number, but the operand is not an unsigned number
 									severity: DiagnosticSeverity.Error,
 									range: Range.create(lineIdx, indices[operandIdx][0], lineIdx, indices[operandIdx][1]),
-									message: `${instruction.name} expects a signed number (-128 to 127) as operand 1`,
+									message: `${instruction.name} expects an unsigned number (0 to 255) here`,
 									source: 'HMMM Language Server',
 									data: 'invalid_operand_type'
 								});

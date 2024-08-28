@@ -172,13 +172,13 @@ export function populateRegisters(completionList: CompletionList) {
 		kind: CompletionItemKind.Variable
 	});
 }
+
 /**
  * Preprocesses a line of HMMM code by removing comments and trimming trailing whitespace
  * @param document The document to read the line from
  * @param line The line number to preprocess
  * @returns The preprocessed line
  */
-
 export function preprocessDocumentLine(document: TextDocument, line: number) {
 	return preprocessLine(document.getText(getRangeForLine(line)));
 }
