@@ -2,7 +2,7 @@
 	"name": "hmmm-language-support",
 	"displayName": "HMMM Language Support",
 	"description": "A HMMM Syntax Highlighter, Debugger, Linter, and Formatter",
-	"version": "2.0.3",
+	"version": "2.0.4",
 	"publisher": "CoolSpy3",
 	"main": "./dist/client/src/extension.js",
 	"categories": [

@@ -1,5 +1,8 @@
 # Change Log
 
+## 2.0.4
+- Fix operand type mismatch error messages
+
 ## 2.0.3
 - Fix a bug where special registers do not show the correct hover text if they are capitalized
 - Fix HMMM Binary formatter and semantic highlighting not working on lines with weird spacing
@@ -51,5 +54,4 @@
 - Fix highlighting of negative numbers
 
 ## 1.0.0
-
 - Initial release
